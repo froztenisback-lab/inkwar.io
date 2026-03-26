@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Paint.io</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.383.0/umd/lucide.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 0; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // Lucide icon shim — wrap lucide UMD components as React elements
+    const { createElement: h } = React;
+    const mkIcon = (name) => ({ size = 24, strokeWidth = 2, className = '' } = {}) => {
+      const el = lucide[name];
+      if (!el) return null;
+      const svg = lucide.createElement(name, { size, strokeWidth });
+      // lucide UMD exposes createIcons / createElement differently; use SVG string fallback
+      return h('span', {
+        className,
+        style: { display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle' },
+        dangerouslySetInnerHTML: { __html: lucide[name] ? '' : '' }
+      });
+    };
+
+    // Better: use lucide's toSvg or just inline the SVG via dangerouslySetInnerHTML
+    function LucideIcon({ name, size = 24, strokeWidth = 2, className = '', fill = 'none' }) {
+      const icons = {
+        PaintBucket: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="m19 11-8-8-8.5 8.5a5.5 5.5 0 0 0 7.78 7.78L19 11z"/><path d="m5 2 5 5"/><path d="M2 13h15"/><path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.4 2-4 .3 1.6 2 2.4 2 4z"/></svg>`,
+        Trophy: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/></svg>`,
+        Play: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" class="${className}"><polygon points="5 3 19 12 5 21 5 3"/></svg>`,
+        Skull: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" class="${className}"><circle cx="9" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><path d="M8 20v2h8v-2"/><path d="m12.5 17-.5-1-.5 1h1z"/><path d="M16 20a2 2 0 0 0 1.56-3.25 8 8 0 1 0-11.12 0A2 2 0 0 0 8 20"/></svg>`,
+        Shield: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></svg>`,
+        Settings: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>`,
+        Clock: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" class="${className}"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+        ChevronDown: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="m6 9 6 6 6-6"/></svg>`,
+        ChevronUp: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="m18 15-6-6-6 6"/></svg>`,
+        Sword: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" class="${className}"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" x2="19" y1="19" y2="13"/><line x1="16" x2="20" y1="16" y2="20"/><line x1="19" x2="21" y1="21" y2="19"/></svg>`,
+        Building2: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>`,
+        ShoppingBag: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" class="${className}"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><line x1="3" x2="21" y1="6" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>`,
+        Star: `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="${fill}" stroke="currentColor" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" class="${className}"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+      };
+      return h('span', {
+        className,
+        style: { display: 'inline-flex', alignItems: 'center', verticalAlign: 'middle', flexShrink: 0 },
+        dangerouslySetInnerHTML: { __html: icons[name] || '' }
+      });
+    }
+
+    // Icon component shortcuts
+    const PaintBucket = (p) => h(LucideIcon, { ...p, name: 'PaintBucket' });
+    const Trophy      = (p) => h(LucideIcon, { ...p, name: 'Trophy' });
+    const Play        = (p) => h(LucideIcon, { ...p, name: 'Play' });
+    const Skull       = (p) => h(LucideIcon, { ...p, name: 'Skull' });
+    const Shield      = (p) => h(LucideIcon, { ...p, name: 'Shield' });
+    const Settings    = (p) => h(LucideIcon, { ...p, name: 'Settings' });
+    const Clock       = (p) => h(LucideIcon, { ...p, name: 'Clock' });
+    const ChevronDown = (p) => h(LucideIcon, { ...p, name: 'ChevronDown' });
+    const ChevronUp   = (p) => h(LucideIcon, { ...p, name: 'ChevronUp' });
+    const Sword       = (p) => h(LucideIcon, { ...p, name: 'Sword' });
+    const Building2   = (p) => h(LucideIcon, { ...p, name: 'Building2' });
+    const ShoppingBag = (p) => h(LucideIcon, { ...p, name: 'ShoppingBag' });
+    const Star        = (p) => h(LucideIcon, { ...p, name: 'Star' });
+
+    // ─── Constants ───────────────────────────────────────────────────────────────
+    const GRID_W = 60;
+    const GRID_H = 40;
+    const CELL_SIZE = 15;
+    const TICK_RATE = 100;
+
+    const COLORS = {
+      0: '#f1f5f9', 1: '#3b82f6', 2: '#ef4444', 3: '#10b981', 4: '#f59e0b', 9: '#334155',
+    };
+
+    const BUILDING_EMOJIS = { factory: '🏭', farm: '🚜', fort: '🏰', infra: '⚡' };
+    const BUILDING_HP     = { factory: 3, farm: 2, fort: 5, infra: 4 };
+    const BUILDING_COCOA  = { factory: 4, farm: 2, fort: 6, infra: 5 };
+
+    const BUCKET_UPGRADES = [
+      { radius: 1, label: 'Basic',  desc: '1×1 tile',  cocoaCost: 0  },
+      { radius: 2, label: 'Wide',   desc: '3×3 area',  cocoaCost: 8  },
+      { radius: 3, label: 'Splash', desc: '5×5 area',  cocoaCost: 20 },
+      { radius: 4, label: 'Flood',  desc: '7×7 area',  cocoaCost: 45 },
+    ];
+
+    const fmt = (n) => {
+      if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+      if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
+      return String(n);
+    };
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────────
+    const findTerritoryTile = (grid, id) => {
+      const t = [];
+      for (let y = 0; y < GRID_H; y++)
+        for (let x = 0; x < GRID_W; x++)
+          if (grid[y][x] === id) t.push({ x, y });
+      return t.length ? t[Math.floor(Math.random() * t.length)] : null;
+    };
+
+    const findBorderTile = (grid, id) => {
+      const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+      const b = [];
+      for (let y = 0; y < GRID_H; y++)
+        for (let x = 0; x < GRID_W; x++)
+          if (grid[y][x] === id)
+            for (const [dy,dx] of dirs) {
+              const ny = y+dy, nx = x+dx;
+              if (ny>=0&&ny<GRID_H&&nx>=0&&nx<GRID_W&&grid[ny][nx]!==id&&grid[ny][nx]!==9) { b.push({x,y}); break; }
+            }
+      return b.length ? b[Math.floor(Math.random() * b.length)] : null;
+    };
+
+    // ─── Initial State ────────────────────────────────────────────────────────────
+    const createInitialState = (settings) => {
+      const g = Array.from({ length: GRID_H }, () => Array(GRID_W).fill(0));
+      for (let i = 0; i < 18; i++) {
+        const ox=Math.floor(Math.random()*GRID_W), oy=Math.floor(Math.random()*GRID_H);
+        const r=Math.floor(Math.random()*3)+1;
+        for (let y=oy-r; y<=oy+r; y++)
+          for (let x=ox-r; x<=ox+r; x++)
+            if (x>=0&&x<GRID_W&&y>=0&&y<GRID_H&&Math.random()>0.4) g[y][x]=9;
+      }
+      const spawn = (id,cx,cy) => {
+        for (let y=cy-2;y<=cy+2;y++) for (let x=cx-2;x<=cx+2;x++) if(x>=0&&x<GRID_W&&y>=0&&y<GRID_H) g[y][x]=0;
+        for (let y=cy-1;y<=cy+1;y++) for (let x=cx-1;x<=cx+1;x++) if(x>=0&&x<GRID_W&&y>=0&&y<GRID_H) g[y][x]=id;
+      };
+      const ent = (id,name) => ({
+        id, name, color: COLORS[id],
+        potatoes: id===1?10:0, paintUnits: 4, pixels: 9,
+        factories:0, factoryCost:20, farms:0, farmCost:50,
+        forts:0, fortCost:300, infrastructures:0, infraCost:500, soldiers:0, soldierCost:150
+      });
+      spawn(1,5,5);
+      const bots = [];
+      if(settings.botCount>=1){spawn(2,GRID_W-6,GRID_H-6); bots.push(ent(2,'Alpha'));}
+      if(settings.botCount>=2){spawn(3,GRID_W-6,5);         bots.push(ent(3,'Beta'));}
+      if(settings.botCount>=3){spawn(4,5,GRID_H-6);         bots.push(ent(4,'Gamma'));}
+      return { grid:g, tickCount:0, settings, player:ent(1,'You'), bots, buildings:[], soldiers:[] };
+    };
+
+    // ─── App ──────────────────────────────────────────────────────────────────────
+    function App() {
+      const [cocoaBeans, setCocoaBeans]   = React.useState(() => Number(localStorage.getItem('cocoaBeans')||0));
+      const [bucketLevel, setBucketLevel] = React.useState(() => Number(localStorage.getItem('bucketLevel')||0));
+      const [gameStatus, setGameStatus]   = React.useState('menu');
+      const [settings, setSettings]       = React.useState({ duration:0, botCount:3, difficulty:'normal' });
+      const [menuTab, setMenuTab]         = React.useState('setup');
+
+      const canvasRef   = React.useRef(null);
+      const requestRef  = React.useRef(null);
+      const stateRef    = React.useRef(null);
+      const isMouseDown = React.useRef(false);
+      const bucketRef   = React.useRef(bucketLevel);
+      React.useEffect(() => { bucketRef.current = bucketLevel; }, [bucketLevel]);
+
+      const [uiState, setUiState] = React.useState({
+        potatoes:0, paintUnits:0, pixels:0, tickCount:0, leaderboard:[],
+        factories:0, factoryCost:0, farms:0, farmCost:0,
+        forts:0, fortCost:0, infrastructures:0, infraCost:0, soldiers:0, soldierCost:0,
+      });
+      const [panelOpen, setPanelOpen] = React.useState({ units:false, buildings:false });
+
+      React.useEffect(() => { localStorage.setItem('cocoaBeans', cocoaBeans); }, [cocoaBeans]);
+      React.useEffect(() => { localStorage.setItem('bucketLevel', bucketLevel); }, [bucketLevel]);
+
+      const addCocoa = React.useCallback((n) => {
+        setCocoaBeans(prev => { const nv=prev+n; localStorage.setItem('cocoaBeans',nv); return nv; });
+      }, []);
+
+      const syncUI = React.useCallback(() => {
+        if (!stateRef.current) return;
+        const s = stateRef.current;
+        const all = [s.player, ...s.bots];
+        setUiState({
+          potatoes:s.player.potatoes, paintUnits:s.player.paintUnits, pixels:s.player.pixels,
+          tickCount:s.tickCount,
+          factories:s.player.factories, factoryCost:s.player.factoryCost,
+          farms:s.player.farms, farmCost:s.player.farmCost,
+          forts:s.player.forts, fortCost:s.player.fortCost,
+          infrastructures:s.player.infrastructures, infraCost:s.player.infraCost,
+          soldiers:s.player.soldiers, soldierCost:s.player.soldierCost,
+          leaderboard: all.filter(x=>x.pixels>0).sort((a,b)=>b.pixels-a.pixels)
+            .map(x=>({id:x.id,name:x.name,pixels:x.pixels,color:x.color}))
+        });
+      }, []);
+
+      // ── Draw ───────────────────────────────────────────────────────────────────
+      const drawCanvas = React.useCallback(() => {
+        if (!canvasRef.current || !stateRef.current) return;
+        const ctx = canvasRef.current.getContext('2d', {alpha:false});
+        const { grid, buildings, soldiers } = stateRef.current;
+
+        ctx.fillStyle = COLORS[0];
+        ctx.fillRect(0, 0, GRID_W*CELL_SIZE, GRID_H*CELL_SIZE);
+
+        for (let y=0;y<GRID_H;y++)
+          for (let x=0;x<GRID_W;x++) {
+            const c=grid[y][x];
+            if(c!==0){ctx.fillStyle=COLORS[c];ctx.fillRect(x*CELL_SIZE,y*CELL_SIZE,CELL_SIZE,CELL_SIZE);}
+          }
+
+        // Grid lines
+        ctx.strokeStyle='rgba(0,0,0,0.04)'; ctx.lineWidth=0.5; ctx.beginPath();
+        for(let y=0;y<=GRID_H;y++){ctx.moveTo(0,y*CELL_SIZE);ctx.lineTo(GRID_W*CELL_SIZE,y*CELL_SIZE);}
+        for(let x=0;x<=GRID_W;x++){ctx.moveTo(x*CELL_SIZE,0);ctx.lineTo(x*CELL_SIZE,GRID_H*CELL_SIZE);}
+        ctx.stroke();
+
+        // Buildings
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        for (const b of buildings) {
+          const px=b.x*CELL_SIZE, py=b.y*CELL_SIZE;
+          const hpFrac = b.hp / BUILDING_HP[b.type];
+          ctx.fillStyle='rgba(0,0,0,0.35)';
+          ctx.fillRect(px+1, py+CELL_SIZE-4, CELL_SIZE-2, 3);
+          ctx.fillStyle = hpFrac>0.6?'#22c55e':hpFrac>0.3?'#f59e0b':'#ef4444';
+          ctx.fillRect(px+1, py+CELL_SIZE-4, Math.floor((CELL_SIZE-2)*hpFrac), 3);
+          ctx.font=`${CELL_SIZE-3}px serif`;
+          ctx.fillText(BUILDING_EMOJIS[b.type], px+CELL_SIZE/2, py+CELL_SIZE/2-1);
+          if (b.damageFlash>0) {
+            ctx.save(); ctx.globalAlpha=b.damageFlash/6; ctx.fillStyle='#ffffff';
+            ctx.fillRect(px,py,CELL_SIZE,CELL_SIZE); ctx.restore(); b.damageFlash--;
+          }
+        }
+
+        // Soldiers
+        ctx.font=`${CELL_SIZE-1}px serif`;
+        for (const s of soldiers) {
+          ctx.fillText('🪖', s.x*CELL_SIZE+CELL_SIZE/2, s.y*CELL_SIZE+CELL_SIZE/2);
+          if (s.shootFlash>0) {
+            const[dy,dx]=s.dir;
+            ctx.save(); ctx.globalAlpha=s.shootFlash/5; ctx.fillStyle=COLORS[s.ownerId];
+            ctx.beginPath();
+            ctx.arc((s.x+dx)*CELL_SIZE+CELL_SIZE/2,(s.y+dy)*CELL_SIZE+CELL_SIZE/2,CELL_SIZE/2,0,Math.PI*2);
+            ctx.fill(); ctx.restore(); s.shootFlash--;
+          }
+        }
+      }, []);
+
+      // ── Game Logic ─────────────────────────────────────────────────────────────
+      const updateLogic = React.useCallback(() => {
+        const state = stateRef.current;
+        state.tickCount++;
+        const all = [state.player, ...state.bots];
+        const dirs = [[-1,0],[1,0],[0,-1],[0,1]];
+
+        const counts={1:0,2:0,3:0,4:0};
+        for(let y=0;y<GRID_H;y++) for(let x=0;x<GRID_W;x++){const c=state.grid[y][x];if(c>0&&c<9)counts[c]++;}
+        state.player.pixels=counts[1];
+        state.bots.forEach(b=>b.pixels=counts[b.id]||0);
+
+        if(state.player.pixels===0){setGameStatus('gameover');return;}
+        if(state.bots.filter(b=>b.pixels>0).length===0){setGameStatus('victory');return;}
+        if(state.settings.duration>0&&state.tickCount>=state.settings.duration*10){setGameStatus('timeup');return;}
+
+        const easy=state.settings.difficulty==='easy', hard=state.settings.difficulty==='hard';
+        const expandInt=easy?10:hard?3:5, craftInt=easy?30:hard?8:15, purchaseInt=easy?30:hard?10:20;
+        const diffMul=easy?0.005:hard?0.02:0.01, baseLimit=easy?1:hard?3:2;
+
+        if(state.tickCount%10===0)
+          all.forEach(e=>{if(e.pixels>0){const m=1+0.2*e.infrastructures;e.potatoes+=Math.floor((e.pixels+e.farms*10)*m);}});
+
+        const damageBuilding = (bldIdx, attackerId) => {
+          const bld = state.buildings[bldIdx];
+          bld.hp--; bld.damageFlash=6;
+          if(bld.hp<=0){
+            if(attackerId===1) addCocoa(BUILDING_COCOA[bld.type]);
+            state.buildings.splice(bldIdx,1);
+            return true;
+          }
+          return false;
+        };
+
+        if(state.tickCount%purchaseInt===0)
+          state.bots.forEach(b=>{
+            if(b.pixels<=0)return;
+            const place=(type)=>{const t=findTerritoryTile(state.grid,b.id);if(t)state.buildings.push({x:t.x,y:t.y,type,ownerId:b.id,hp:BUILDING_HP[type],damageFlash:0});};
+            if(b.potatoes>=b.soldierCost&&b.soldiers<5){
+              b.potatoes-=b.soldierCost; b.soldiers++; b.soldierCost=Math.floor(b.soldierCost*1.4);
+              const t=findBorderTile(state.grid,b.id)||findTerritoryTile(state.grid,b.id);
+              if(t)state.soldiers.push({x:t.x,y:t.y,ownerId:b.id,dir:[0,1],shootCooldown:15+Math.floor(Math.random()*10),shootFlash:0});
+            } else if(b.potatoes>=b.infraCost&&b.infrastructures<Math.floor(b.factories/2)){b.potatoes-=b.infraCost;b.infrastructures++;b.infraCost=Math.floor(b.infraCost*1.5);place('infra');}
+            else if(b.potatoes>=b.fortCost&&b.forts<5){b.potatoes-=b.fortCost;b.forts++;b.fortCost=Math.floor(b.fortCost*1.5);place('fort');}
+            else if(b.potatoes>=b.farmCost&&b.farms<b.factories+1){b.potatoes-=b.farmCost;b.farms++;b.farmCost=Math.floor(b.farmCost*1.5);place('farm');}
+            else if(b.potatoes>=b.factoryCost){b.potatoes-=b.factoryCost;b.factories++;b.factoryCost=Math.floor(b.factoryCost*1.5);place('factory');}
+          });
+
+        if(state.tickCount%craftInt===0)
+          state.bots.forEach(b=>{if(b.pixels>0){const m=1+0.2*b.infrastructures;b.paintUnits+=Math.floor(4*(1+b.factories)*m);}});
+
+        state.soldiers=state.soldiers.filter(s=>state.grid[s.y]&&state.grid[s.y][s.x]===s.ownerId);
+        for(const s of state.soldiers){
+          s.shootFlash=Math.max(0,s.shootFlash-1); s.shootCooldown--;
+          if(s.shootCooldown<=0){
+            s.shootCooldown=hard?8:easy?20:12;
+            const tgts=[];
+            for(const[dy,dx]of dirs){
+              const ny=s.y+dy,nx=s.x+dx;
+              if(ny>=0&&ny<GRID_H&&nx>=0&&nx<GRID_W&&state.grid[ny][nx]!==s.ownerId&&state.grid[ny][nx]!==9) tgts.push({y:ny,x:nx,dy,dx});
+            }
+            if(tgts.length>0){
+              const tgt=tgts[Math.floor(Math.random()*tgts.length)];
+              const tOwnId=state.grid[tgt.y][tgt.x];
+              let blocked=false;
+              if(tOwnId!==0){const tOwn=all.find(e=>e.id===tOwnId);if(tOwn&&tOwn.forts>0&&Math.random()<Math.min(0.8,tOwn.forts*0.1))blocked=true;}
+              if(!blocked){
+                const bldIdx=state.buildings.findIndex(b=>b.x===tgt.x&&b.y===tgt.y&&b.ownerId!==s.ownerId);
+                if(bldIdx>=0){
+                  damageBuilding(bldIdx, s.ownerId);
+                } else {
+                  state.grid[tgt.y][tgt.x]=s.ownerId;
+                }
+                s.dir=[tgt.dy,tgt.dx]; s.shootFlash=5;
+              }
+              const bt=findBorderTile(state.grid,s.ownerId);
+              if(bt&&Math.random()<0.3){s.x=bt.x;s.y=bt.y;}
+            } else {
+              const bt=findBorderTile(state.grid,s.ownerId);
+              if(bt){s.x=bt.x;s.y=bt.y;}
+            }
+          }
+        }
+
+        // Bot expansion
+        if(state.tickCount%expandInt===0)
+          state.bots.forEach(b=>{
+            if(b.pixels<=0||b.paintUnits<=0)return;
+            const tgts=[];
+            for(let y=0;y<GRID_H;y++) for(let x=0;x<GRID_W;x++)
+              if(state.grid[y][x]===b.id) for(const[dy,dx]of dirs){
+                const ny=y+dy,nx=x+dx;
+                if(ny>=0&&ny<GRID_H&&nx>=0&&nx<GRID_W&&state.grid[ny][nx]!==b.id&&state.grid[ny][nx]!==9) tgts.push({y:ny,x:nx});
+              }
+            if(!tgts.length)return;
+            for(let i=tgts.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[tgts[i],tgts[j]]=[tgts[j],tgts[i]];}
+            let limit=Math.floor(b.pixels*diffMul)+baseLimit, used=0;
+            for(let i=0;i<tgts.length&&used<limit&&b.paintUnits>0;i++){
+              const t=tgts[i];
+              const tOwnId=state.grid[t.y][t.x];
+              let blocked=false;
+              if(tOwnId!==0){const tOwn=all.find(e=>e.id===tOwnId);if(tOwn&&tOwn.forts>0&&Math.random()<Math.min(0.8,tOwn.forts*0.1))blocked=true;}
+              if(!blocked){
+                const bldIdx=state.buildings.findIndex(bd=>bd.x===t.x&&bd.y===t.y&&bd.ownerId!==b.id);
+                if(bldIdx>=0){
+                  damageBuilding(bldIdx, b.id);
+                } else {
+                  state.grid[t.y][t.x]=b.id; b.paintUnits--; used++;
+                }
+              }
+            }
+          });
+
+        state.buildings=state.buildings.filter(b=>state.grid[b.y]&&state.grid[b.y][b.x]===b.ownerId);
+        if(state.tickCount%2===0) syncUI();
+      }, [syncUI, addCocoa]);
+
+      // ── Engine Hooks ───────────────────────────────────────────────────────────
+      React.useEffect(()=>{
+        if(gameStatus!=='playing')return;
+        const ti=setInterval(updateLogic,TICK_RATE);
+        const rf=()=>{drawCanvas();requestRef.current=requestAnimationFrame(rf);};
+        requestRef.current=requestAnimationFrame(rf);
+        const up=()=>{isMouseDown.current=false;};
+        window.addEventListener('mouseup',up);
+        return()=>{clearInterval(ti);cancelAnimationFrame(requestRef.current);window.removeEventListener('mouseup',up);};
+      },[gameStatus,updateLogic,drawCanvas]);
+
+      // ── Player Paint ──────────────────────────────────────────────────────────
+      const attemptPaint = React.useCallback((e)=>{
+        if(gameStatus!=='playing'||!isMouseDown.current)return;
+        const rect=canvasRef.current.getBoundingClientRect();
+        const sx=canvasRef.current.width/rect.width, sy=canvasRef.current.height/rect.height;
+        const cx=Math.floor(((e.clientX-rect.left)*sx)/CELL_SIZE);
+        const cy=Math.floor(((e.clientY-rect.top)*sy)/CELL_SIZE);
+        if(cx<0||cx>=GRID_W||cy<0||cy>=GRID_H)return;
+        const state=stateRef.current;
+        if(state.player.paintUnits<=0)return;
+
+        const span = bucketRef.current;
+        const painted=[];
+
+        for(let dy=-(span-1);dy<=(span-1);dy++){
+          for(let dx=-(span-1);dx<=(span-1);dx++){
+            const x=cx+dx, y=cy+dy;
+            if(x<0||x>=GRID_W||y<0||y>=GRID_H)continue;
+            if(state.grid[y][x]===1||state.grid[y][x]===9)continue;
+            if(state.player.paintUnits<=0)break;
+
+            let adj=false;
+            for(const[ay,ax]of[[-1,0],[1,0],[0,-1],[0,1]]){
+              const ny2=y+ay,nx2=x+ax;
+              if(ny2>=0&&ny2<GRID_H&&nx2>=0&&nx2<GRID_W&&state.grid[ny2][nx2]===1){adj=true;break;}
+            }
+            if(!adj&&painted.length>0){
+              for(const p of painted){if(Math.abs(p.x-x)<=1&&Math.abs(p.y-y)<=1){adj=true;break;}}
+            }
+            if(!adj)continue;
+
+            const tOwnId=state.grid[y][x];
+            let blocked=false;
+            if(tOwnId!==0){const tOwn=state.bots.find(b=>b.id===tOwnId);if(tOwn&&tOwn.forts>0&&Math.random()<Math.min(0.8,tOwn.forts*0.1))blocked=true;}
+            if(blocked){state.player.paintUnits--;continue;}
+
+            const bldIdx=state.buildings.findIndex(b=>b.x===x&&b.y===y&&b.ownerId!==1);
+            if(bldIdx>=0){
+              const bld=state.buildings[bldIdx];
+              bld.hp--; bld.damageFlash=6;
+              if(bld.hp<=0){addCocoa(BUILDING_COCOA[bld.type]);state.buildings.splice(bldIdx,1);}
+              state.player.paintUnits--;
+              continue;
+            }
+
+            state.grid[y][x]=1; state.player.paintUnits--; painted.push({x,y});
+          }
+        }
+        if(painted.length>0){
+          const ctx=canvasRef.current.getContext('2d');
+          ctx.fillStyle=COLORS[1];
+          for(const p of painted) ctx.fillRect(p.x*CELL_SIZE,p.y*CELL_SIZE,CELL_SIZE,CELL_SIZE);
+          syncUI();
+        }
+      },[gameStatus,syncUI,addCocoa]);
+
+      // ── Purchases ─────────────────────────────────────────────────────────────
+      const handleCraftPaint=()=>{
+        if(gameStatus!=='playing')return;
+        const p=stateRef.current.player;
+        p.paintUnits+=Math.floor(4*(1+p.factories)*(1+0.2*p.infrastructures));
+        syncUI();
+      };
+      const buyBuilding=(type,costKey,mapType)=>{
+        const p=stateRef.current.player;
+        if(p.potatoes<p[costKey])return;
+        p.potatoes-=p[costKey]; p[type]++; p[costKey]=Math.floor(p[costKey]*1.5);
+        const t=findTerritoryTile(stateRef.current.grid,1);
+        if(t)stateRef.current.buildings.push({x:t.x,y:t.y,type:mapType,ownerId:1,hp:BUILDING_HP[mapType],damageFlash:0});
+        syncUI();
+      };
+      const buySoldier=()=>{
+        const p=stateRef.current.player;
+        if(p.potatoes<p.soldierCost)return;
+        p.potatoes-=p.soldierCost; p.soldiers++; p.soldierCost=Math.floor(p.soldierCost*1.4);
+        const t=findBorderTile(stateRef.current.grid,1)||findTerritoryTile(stateRef.current.grid,1);
+        if(t)stateRef.current.soldiers.push({x:t.x,y:t.y,ownerId:1,dir:[0,1],shootCooldown:10,shootFlash:0});
+        syncUI();
+      };
+      const buyBucketUpgrade=()=>{
+        const next=bucketLevel+1;
+        if(next>=BUCKET_UPGRADES.length)return;
+        const cost=BUCKET_UPGRADES[next].cocoaCost;
+        if(cocoaBeans<cost)return;
+        setCocoaBeans(prev=>{const nv=prev-cost;localStorage.setItem('cocoaBeans',nv);return nv;});
+        setBucketLevel(next);
+      };
+
+      const startGame=()=>{stateRef.current=createInitialState(settings);setGameStatus('playing');syncUI();};
+      const formatTime=(ticks)=>{const s=Math.max(0,settings.duration-Math.floor(ticks/10));return`${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;};
+      const togglePanel=(p)=>setPanelOpen(prev=>({units:false,buildings:false,[p]:!prev[p]}));
+      const paintPerClick=Math.floor(4*(1+uiState.factories)*(1+0.2*uiState.infrastructures));
+
+      return (
+        <div style={{fontFamily:"'Segoe UI',system-ui,sans-serif"}} className="min-h-screen bg-slate-100 text-slate-800 flex flex-col p-3 md:p-5">
+
+          <header className="mb-3 flex items-center justify-between">
+            <h1 className="text-2xl font-black text-blue-600 flex items-center gap-2">
+              <PaintBucket size={24} strokeWidth={2.5}/> Paint.io
+            </h1>
+            <div className="flex items-center gap-2">
+              <div className="bg-amber-50 border border-amber-200 px-3 py-1 rounded-full flex items-center gap-1.5 text-sm font-bold text-amber-700 shadow-sm">
+                🫘 {fmt(cocoaBeans)}
+              </div>
+              {gameStatus==='playing'&&settings.duration>0&&(
+                <span className="bg-white px-3 py-1 rounded-full text-sm font-bold shadow-sm border border-slate-200 flex items-center gap-1">
+                  <Clock size={13}/> {formatTime(uiState.tickCount)}
+                </span>
+              )}
+              {gameStatus==='playing'&&(
+                <span className="bg-white px-3 py-1 rounded-full text-sm font-bold shadow-sm border border-slate-200 text-slate-500">
+                  {uiState.pixels} px
+                </span>
+              )}
+            </div>
+          </header>
+
+          <div className="flex flex-col lg:flex-row gap-4 items-start max-w-[1400px] mx-auto w-full">
+
+            {/* Sidebar */}
+            <aside className="w-full lg:w-72 shrink-0 flex flex-col gap-3">
+
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-slate-50 p-3 rounded-xl flex flex-col items-center border border-slate-100">
+                    <span className="text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Potatoes</span>
+                    <span className="text-xl font-black text-slate-700">{fmt(uiState.potatoes)} 🥔</span>
+                    <span className="text-[10px] text-emerald-500 font-bold bg-emerald-50 px-2 py-0.5 rounded-full mt-1">
+                      +{Math.floor((uiState.pixels+uiState.farms*10)*(1+0.2*uiState.infrastructures))}/s
+                    </span>
+                  </div>
+                  <div className="bg-blue-50 p-3 rounded-xl flex flex-col items-center border border-blue-100">
+                    <span className="text-blue-400 text-[10px] font-bold uppercase tracking-wider mb-1">Paint</span>
+                    <span className="text-xl font-black text-blue-600">{fmt(uiState.paintUnits)} 🪣</span>
+                    {uiState.paintUnits===0&&gameStatus==='playing'&&(
+                      <span className="text-[10px] text-red-500 font-bold mt-1 animate-pulse">EMPTY!</span>
+                    )}
+                  </div>
+                </div>
+                {bucketLevel>0&&(
+                  <div className="mt-2 flex items-center justify-center gap-1.5 bg-purple-50 border border-purple-200 rounded-xl px-3 py-1.5">
+                    <span className="text-base">🪣</span>
+                    <span className="text-xs font-bold text-purple-700">{BUCKET_UPGRADES[bucketLevel].label} Bucket</span>
+                    <span className="text-[10px] text-purple-400">· {BUCKET_UPGRADES[bucketLevel].desc}</span>
+                  </div>
+                )}
+              </div>
+
+              <button onClick={handleCraftPaint} disabled={gameStatus!=='playing'}
+                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-bold py-3 rounded-xl shadow active:scale-[0.98] transition-all flex flex-col items-center border-b-4 border-blue-800 active:border-b-0 active:translate-y-1">
+                <div className="flex items-center gap-2 text-base"><PaintBucket size={18}/> Produce Paint</div>
+                <span className="text-blue-200 text-xs">+{paintPerClick} uses</span>
+              </button>
+
+              {/* Units Panel */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <button onClick={()=>togglePanel('units')} className="w-full flex items-center justify-between px-4 py-3 font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+                  <span className="flex items-center gap-2 text-sm">
+                    <Sword size={15} className="text-red-500"/> Army Units
+                    {uiState.soldiers>0&&<span className="bg-red-100 text-red-600 text-xs font-bold px-2 py-0.5 rounded-full">{uiState.soldiers}</span>}
+                  </span>
+                  {panelOpen.units?<ChevronUp size={15}/>:<ChevronDown size={15}/>}
+                </button>
+                {panelOpen.units&&(
+                  <div className="px-4 pb-4 border-t border-slate-100">
+                    <div className="mt-3 bg-slate-50 rounded-xl p-3 border border-slate-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-2xl">🪖</span>
+                        <div>
+                          <div className="font-bold text-sm text-slate-700">Soldier</div>
+                          <div className="text-[11px] text-slate-400">Patrols border, auto-fires + damages buildings</div>
+                        </div>
+                      </div>
+                      <button onClick={buySoldier} disabled={gameStatus!=='playing'||uiState.potatoes<uiState.soldierCost}
+                        className="w-full bg-red-500 hover:bg-red-600 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold py-2 rounded-lg text-sm flex items-center justify-between px-3">
+                        <span>Deploy Soldier</span>
+                        <span className="bg-black/10 px-2 py-0.5 rounded-md">{fmt(uiState.soldierCost)} 🥔</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Buildings Panel */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <button onClick={()=>togglePanel('buildings')} className="w-full flex items-center justify-between px-4 py-3 font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+                  <span className="flex items-center gap-2 text-sm">
+                    <Building2 size={15} className="text-emerald-500"/> Buildings
+                  </span>
+                  {panelOpen.buildings?<ChevronUp size={15}/>:<ChevronDown size={15}/>}
+                </button>
+                {panelOpen.buildings&&(
+                  <div className="px-3 pb-4 border-t border-slate-100">
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <BCard emoji="🏭" name="Factory" desc="+4 paint/click" hpLabel={`${BUILDING_HP.factory} HP`} level={uiState.factories} cost={uiState.factoryCost} canBuy={gameStatus==='playing'&&uiState.potatoes>=uiState.factoryCost} color="emerald" onClick={()=>buyBuilding('factories','factoryCost','factory')}/>
+                      <BCard emoji="🚜" name="Farm" desc="+10 🥔/sec" hpLabel={`${BUILDING_HP.farm} HP`} level={uiState.farms} cost={uiState.farmCost} canBuy={gameStatus==='playing'&&uiState.potatoes>=uiState.farmCost} color="amber" onClick={()=>buyBuilding('farms','farmCost','farm')}/>
+                      <BCard emoji="🏰" name="Fort" desc="10% block/lvl" hpLabel={`${BUILDING_HP.fort} HP`} level={uiState.forts} cost={uiState.fortCost} canBuy={gameStatus==='playing'&&uiState.potatoes>=uiState.fortCost} color="slate" onClick={()=>buyBuilding('forts','fortCost','fort')}/>
+                      <BCard emoji="⚡" name="Infra" desc="+20% efficiency" hpLabel={`${BUILDING_HP.infra} HP`} level={uiState.infrastructures} cost={uiState.infraCost} canBuy={gameStatus==='playing'&&uiState.potatoes>=uiState.infraCost} color="indigo" onClick={()=>buyBuilding('infrastructures','infraCost','infra')}/>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Leaderboard */}
+              <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <h2 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-2"><Trophy size={13}/> Leaderboard</h2>
+                <div className="flex flex-col gap-1.5">
+                  {uiState.leaderboard.map((e,i)=>(
+                    <div key={e.id} className="flex justify-between items-center px-2 py-1.5 rounded-lg bg-slate-50">
+                      <div className="flex items-center gap-2 text-sm font-medium">
+                        <span className="text-xs text-slate-400 w-3">{i+1}.</span>
+                        <div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor:e.color}}/>
+                        <span className={e.id===1?'text-blue-600 font-bold':'text-slate-600'}>{e.name}</span>
+                      </div>
+                      <span className="text-xs font-bold text-slate-700">{fmt(e.pixels)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </aside>
+
+            {/* Canvas */}
+            <main className="flex-1 relative rounded-2xl overflow-hidden shadow-lg border-4 border-white bg-white">
+              <canvas ref={canvasRef} width={GRID_W*CELL_SIZE} height={GRID_H*CELL_SIZE}
+                className="w-full h-auto cursor-crosshair touch-none"
+                onMouseDown={(e)=>{isMouseDown.current=true;attemptPaint(e);}}
+                onMouseMove={attemptPaint}
+                onMouseLeave={()=>{isMouseDown.current=false;}}/>
+
+              {/* Menu */}
+              {gameStatus==='menu'&&(
+                <div className="absolute inset-0 bg-slate-900/85 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+                  <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden">
+                    {/* Tabs */}
+                    <div className="flex border-b border-slate-200">
+                      <button onClick={()=>setMenuTab('setup')}
+                        className={`flex-1 py-3.5 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${menuTab==='setup'?'text-blue-600 border-b-2 border-blue-600 bg-blue-50/40':'text-slate-500 hover:bg-slate-50'}`}>
+                        <Settings size={14}/> Game Setup
+                      </button>
+                      <button onClick={()=>setMenuTab('upgrade')}
+                        className={`flex-1 py-3.5 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${menuTab==='upgrade'?'text-amber-600 border-b-2 border-amber-500 bg-amber-50/40':'text-slate-500 hover:bg-slate-50'}`}>
+                        <ShoppingBag size={14}/> Upgrade Shop
+                        <span className="bg-amber-100 text-amber-700 text-[10px] font-black px-1.5 py-0.5 rounded-full">🫘 {fmt(cocoaBeans)}</span>
+                      </button>
+                    </div>
+
+                    <div className="p-6">
+                      {menuTab==='setup'&&(
+                        <>
+                          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 mb-5 space-y-3">
+                            {[
+                              {label:'Duration',icon:<Clock size={14}/>,key:'duration',opts:[{v:0,l:'Endless'},{v:120,l:'2 min'},{v:300,l:'5 min'}]},
+                              {label:'Bots',icon:<Settings size={14}/>,key:'botCount',opts:[{v:1,l:'1 Enemy'},{v:2,l:'2 Enemies'},{v:3,l:'3 Enemies'}]},
+                              {label:'Difficulty',icon:<Shield size={14}/>,key:'difficulty',opts:[{v:'easy',l:'Easy'},{v:'normal',l:'Normal'},{v:'hard',l:'Hard'}]},
+                            ].map(({label,icon,key,opts})=>(
+                              <div key={key} className="flex items-center justify-between">
+                                <label className="font-bold text-slate-600 flex items-center gap-2 text-sm">{icon} {label}</label>
+                                <select value={settings[key]} onChange={e=>setSettings({...settings,[key]:isNaN(Number(e.target.value))?e.target.value:Number(e.target.value)})}
+                                  className="bg-white border border-slate-300 text-slate-700 rounded-lg px-2 py-1.5 text-sm font-medium focus:outline-none focus:border-blue-500">
+                                  {opts.map(o=><option key={o.v} value={o.v}>{o.l}</option>)}
+                                </select>
+                              </div>
+                            ))}
+                          </div>
+                          {bucketLevel>0&&(
+                            <div className="mb-4 flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-xl px-3 py-2 text-xs font-bold text-purple-700">
+                              <Star size={12}/> Active: {BUCKET_UPGRADES[bucketLevel].label} Bucket — {BUCKET_UPGRADES[bucketLevel].desc}
+                            </div>
+                          )}
+                          <button onClick={startGame} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black text-lg py-3.5 rounded-xl shadow-lg flex justify-center items-center gap-2">
+                            <Play fill="currentColor" size={18}/> START PAINTING
+                          </button>
+                        </>
+                      )}
+
+                      {menuTab==='upgrade'&&(
+                        <div className="space-y-4">
+                          <p className="text-xs text-slate-400">
+                            Earn <span className="font-bold text-amber-600">🫘 Cocoa Beans</span> by destroying enemy buildings. Upgrades carry over between all games.
+                          </p>
+
+                          {/* Bucket upgrade card */}
+                          <div className="bg-slate-50 rounded-2xl border border-slate-200 p-4">
+                            <div className="flex items-center gap-3 mb-3">
+                              <span className="text-3xl">🪣</span>
+                              <div>
+                                <div className="font-black text-slate-800 text-base">Paint Bucket Upgrade</div>
+                                <div className="text-xs text-slate-400">Paint multiple tiles at once by upgrading your bucket radius</div>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-4 gap-1.5 mb-4">
+                              {BUCKET_UPGRADES.map((u,i)=>(
+                                <div key={i} className={`flex flex-col items-center p-2.5 rounded-xl border-2 transition-all
+                                  ${i<bucketLevel?'border-green-400 bg-green-50 opacity-80':''}
+                                  ${i===bucketLevel?'border-blue-400 bg-blue-50 shadow-sm':''}
+                                  ${i>bucketLevel?'border-slate-200 bg-white opacity-60':''}`}>
+                                  <span className="text-xl mb-1">{['🪣','🪣💧','🪣💦','🪣🌊'][i]}</span>
+                                  <span className="text-[10px] font-black text-slate-700 text-center">{u.label}</span>
+                                  <span className="text-[9px] text-slate-400 text-center">{u.desc}</span>
+                                  {i<bucketLevel&&<span className="text-[9px] font-bold text-green-600 mt-1">✓ Done</span>}
+                                  {i===bucketLevel&&<span className="text-[9px] font-bold text-blue-600 mt-1">Active</span>}
+                                  {i>bucketLevel&&<span className="text-[9px] font-bold text-amber-600 mt-1">🫘 {u.cocoaCost}</span>}
+                                </div>
+                              ))}
+                            </div>
+
+                            {bucketLevel<BUCKET_UPGRADES.length-1?(
+                              <button onClick={buyBucketUpgrade} disabled={cocoaBeans<BUCKET_UPGRADES[bucketLevel+1].cocoaCost}
+                                className="w-full bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2 transition-all border-b-4 border-amber-700 active:border-b-0 active:translate-y-1 disabled:border-slate-300">
+                                <Star size={14}/>
+                                Upgrade → {BUCKET_UPGRADES[bucketLevel+1].label}
+                                <span className="bg-black/15 px-2 py-0.5 rounded-lg">🫘 {BUCKET_UPGRADES[bucketLevel+1].cocoaCost}</span>
+                              </button>
+                            ):(
+                              <div className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold py-2.5 rounded-xl text-sm flex items-center justify-center gap-2">
+                                <Star size={14} fill="currentColor"/> MAX LEVEL — Flood Bucket Unlocked!
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Rewards table */}
+                          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                            <div className="font-bold text-amber-800 text-xs mb-2">🫘 How to earn Cocoa Beans</div>
+                            <div className="space-y-1">
+                              {Object.entries(BUILDING_COCOA).map(([type,amt])=>(
+                                <div key={type} className="flex justify-between text-xs text-amber-700">
+                                  <span className="flex items-center gap-1.5">{BUILDING_EMOJIS[type]} Destroy enemy {type}</span>
+                                  <span className="font-bold">+{amt} 🫘</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="mt-2 pt-2 border-t border-amber-200 text-[10px] text-amber-500">
+                              Tip: Soldiers auto-destroy buildings too — deploy them near enemy territory!
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {gameStatus==='gameover'&&<Overlay bg="bg-red-900/90" icon={<Skull size={52} className="text-red-400 mx-auto mb-3"/>} title="WIPED OUT" sub="An enemy painted over your last territory." btnColor="bg-white text-red-600" onBack={()=>setGameStatus('menu')}/>}
+              {gameStatus==='victory'&&<Overlay bg="bg-blue-900/90" icon={<Trophy size={52} className="text-yellow-400 mx-auto mb-3"/>} title="DOMINATION" sub="You painted the whole map!" btnColor="bg-yellow-400 text-yellow-900" onBack={()=>setGameStatus('menu')}/>}
+              {gameStatus==='timeup'&&<Overlay bg="bg-indigo-900/90" icon={<Clock size={52} className="text-indigo-300 mx-auto mb-3"/>} title="TIME'S UP!" sub={uiState.leaderboard[0]?.id===1?'You won!':`${uiState.leaderboard[0]?.name} won!`} btnColor="bg-white text-indigo-900" onBack={()=>setGameStatus('menu')}/>}
+            </main>
+          </div>
+        </div>
+      );
+    }
+
+    function BCard({emoji,name,desc,hpLabel,level,cost,canBuy,color,onClick}){
+      const cls={emerald:'bg-emerald-500 hover:bg-emerald-600 border-emerald-700',amber:'bg-amber-500 hover:bg-amber-600 border-amber-700',slate:'bg-slate-600 hover:bg-slate-700 border-slate-800',indigo:'bg-indigo-500 hover:bg-indigo-600 border-indigo-700'};
+      return(
+        <button onClick={onClick} disabled={!canBuy}
+          className={`flex flex-col items-center p-3 rounded-xl border-b-4 transition-all active:translate-y-1 active:border-b-0 ${canBuy?cls[color]+' text-white':'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'}`}>
+          <span className="text-2xl mb-1">{emoji}</span>
+          <span className="text-xs font-black">{name}</span>
+          <span className="text-[9px] opacity-80">{desc}</span>
+          <span className="text-[9px] opacity-50 mb-1">{hpLabel}</span>
+          <div className="flex items-center gap-1 bg-black/10 px-2 py-0.5 rounded-full text-[10px] font-bold w-full justify-center">{fmt(cost)} 🥔</div>
+          {level>0&&<span className="text-[9px] mt-1 opacity-70">Lvl {level}</span>}
+        </button>
+      );
+    }
+
+    function Overlay({bg,icon,title,sub,btnColor,onBack}){
+      return(
+        <div className={`absolute inset-0 ${bg} backdrop-blur-md flex items-center justify-center p-4 z-50`}>
+          <div className="text-center">{icon}
+            <h2 className="text-4xl font-black text-white mb-2">{title}</h2>
+            <p className="text-white/70 mb-6 font-medium">{sub}</p>
+            <button onClick={onBack} className={`${btnColor} font-bold py-2.5 px-8 rounded-full shadow-lg hover:scale-105 transition-transform`}>Back to Menu</button>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
