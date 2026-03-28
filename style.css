@@ -1,4 +1,4 @@
-        *,
+*,
 :before,
 :after,
 ::backdrop {
@@ -1212,4 +1212,12 @@
                     flex-direction: row;
                 }
             }
+            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+            @keyframes slideIn { from { transform: translateY(4px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+            .animate-in { animation-duration: 0.3s; animation-fill-mode: both; }
+            .fade-in { animation-name: fadeIn; }
+            .slide-in-from-bottom-2 { animation-name: slideIn; }
+            .zoom-in { transform: scale(0.95); animation: zoomIn 0.2s forwards; }
+            @keyframes zoomIn { to { transform: scale(1); } }
+
             /*$vite$:1*/
