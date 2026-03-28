@@ -1,12 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { PaintBucket, Trophy, Play, Skull, Shield, Settings, Clock, ChevronDown, ChevronUp, Sword, Building2, ShoppingBag, Star, X, ArrowUp } from 'lucide-react';
+import { MAP_SETTINGS } from './custom_map';
 
 // ─── Grid & Tick ─────────────────────────────────────────────────────────────
 const GRID_W = 60, GRID_H = 40, CELL_SIZE = 20, TICK_RATE = 100;
 
-const COLORS = { 0:'#f1f5f9', 1:'#3b82f6', 2:'#ef4444', 3:'#10b981', 4:'#f59e0b', 9:'#334155' };
 // Fort-wall tiles: value 10+ownerId (11,12,13,14) — impassable to enemies, walkable for owner
 const FORT_WALL_OFFSET = 10;
+
+// Asset Path Configuration
+// All game textures should be in: public/assets/textures/
+const ASSET_BASE = (import.meta.env.BASE_URL === './' || import.meta.env.BASE_URL === '/') 
+  ? '/assets/textures/' 
+  : `${import.meta.env.BASE_URL.replace(/\/$/, '')}/assets/textures/`;
+
+const getTexture = (name) => name.startsWith('/') ? name : `${ASSET_BASE}${name}`;
 
 // ─── Buildings ────────────────────────────────────────────────────────────────
 // Replaced emoji with sprite paths. Ensure these sprites are in public/sprites.
@@ -40,6 +48,27 @@ const BUCKET_UPGRADES = [
 const fmt = n => n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'k':String(n);
 const clamp = (v,lo,hi) => Math.max(lo, Math.min(hi, v));
 const rnd = n => Math.floor(Math.random()*n);
+
+// Seeded Random Helpers
+const hashString = str => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash << 5) - hash + str.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash;
+};
+const seededRnd = (s) => {
+  const seed = hashString(String(s));
+  let t = seed + 0x6D2B79F5;
+  return () => {
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+};
+
+const COLORS = MAP_SETTINGS.colors;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const isOwned = (cell, id) => cell===id || cell===FORT_WALL_OFFSET+id;
@@ -104,12 +133,53 @@ const makeEnt = (id,name) => ({
   soldierCost:150, scoutCost:200, demoCost:350, rangerCost:500, commanderCost:800,
 });
 
-const createInitialState = settings => {
-  const g = Array.from({length:GRID_H},()=>Array(GRID_W).fill(0));
-  for(let i=0;i<18;i++){
-    const ox=rnd(GRID_W),oy=rnd(GRID_H),r=rnd(3)+1;
-    for(let y=oy-r;y<=oy+r;y++) for(let x=ox-r;x<=ox+r;x++)
-      if(x>=0&&x<GRID_W&&y>=0&&y<GRID_H&&Math.random()>0.4) g[y][x]=9;
+
+const createInitialState = (settings, customMap) => {
+  const sRnd = seededRnd(settings.seed || Math.random());
+  const getRnd = (n) => Math.floor(sRnd() * n);
+
+  const useUserMap = settings.mapType === 'custom' && customMap;
+  const g = useUserMap 
+    ? customMap.map(row => [...row]) 
+    : Array.from({length:GRID_H},()=>Array(GRID_W).fill(0));
+    
+  if(!useUserMap) {
+    if (settings.mapType === 'realistic') {
+      if (settings.continentType === 'archipelago') {
+        for(let i=0; i<15; i++){
+          const ox=getRnd(GRID_W), oy=getRnd(GRID_H), r=getRnd(3)+2;
+          for(let y=oy-r;y<=oy+r;y++) for(let x=ox-r;x<=ox+r;x++)
+            if(x>=0&&x<GRID_W&&y>=0&&y<GRID_H && Math.hypot(x-ox, y-oy) < r && sRnd() > 0.3) g[y][x]=9;
+        }
+      } else { // Pangea
+        const ox=GRID_W/2, oy=GRID_H/2, r=12;
+        for(let y=oy-r;y<=oy+r;y++) for(let x=ox-r;x<=ox+r;x++)
+          if(x>=0&&x<GRID_W&&y>=0&&y<GRID_H && Math.hypot(x-ox, y-oy) < r && sRnd() > 0.4) g[y][x]=9;
+      }
+    } else {
+      const clusters = settings.terrainDensity || MAP_SETTINGS.terrainClusters;
+      if (settings.terrainType === 'maze') {
+        for(let i=0; i<clusters/2; i++) {
+          const x = getRnd(GRID_W), y = getRnd(GRID_H), len = getRnd(10)+5, vert = sRnd()>0.5;
+          for(let j=0; j<len; j++) {
+            const nx = vert?x:x+j, ny = vert?y+j:y;
+            if(nx<GRID_W && ny<GRID_H) g[ny][nx]=9;
+          }
+        }
+      } else if (settings.terrainType === 'grouped') {
+        for(let i=0; i<clusters/4; i++){
+          const ox=getRnd(GRID_W),oy=getRnd(GRID_H),r=getRnd(4)+3;
+          for(let y=oy-r;y<=oy+r;y++) for(let x=ox-r;x<=ox+r;x++)
+            if(x>=0&&x<GRID_W&&y>=0&&y<GRID_H&&sRnd()>0.3) g[y][x]=9;
+        }
+      } else { // scattered
+        for(let i=0; i<clusters; i++){
+          const ox=getRnd(GRID_W),oy=getRnd(GRID_H),r=getRnd(3)+1;
+          for(let y=oy-r;y<=oy+r;y++) for(let x=ox-r;x<=ox+r;x++)
+            if(x>=0&&x<GRID_W&&y>=0&&y<GRID_H&&sRnd()>0.4) g[y][x]=9;
+        }
+      }
+    }
   }
   // Always spawn a 3x3 cluster for the player and bots
   const spawn=(id,cx,cy)=>{
@@ -118,17 +188,42 @@ const createInitialState = settings => {
     // Set a 3x3 cluster
     for(let y=cy-1;y<=cy+1;y++) for(let x=cx-1;x<=cx+1;x++) if(x>=0&&x<GRID_W&&y>=0&&y<GRID_H) g[y][x]=id;
   };
-  spawn(1,5,5);
-  const bots=[];
-  if(settings.botCount>=1){spawn(2,GRID_W-6,GRID_H-6);bots.push(makeEnt(2,'Alpha'));}
-  if(settings.botCount>=2){spawn(3,GRID_W-6,5);bots.push(makeEnt(3,'Beta'));}
-  if(settings.botCount>=3){spawn(4,5,GRID_H-6);bots.push(makeEnt(4,'Gamma'));}
-  return {grid:g,tickCount:0,settings,player:makeEnt(1,'You'),bots,buildings:[],units:[]};
+
+  // Procedural Spawn Logic: Find points that are spread out based on the seed
+  if (!useUserMap) {
+    const pts = [];
+    const margin = 8;
+    const playerCount = settings.botCount + 1;
+
+    for (let i = 0; i < playerCount; i++) {
+      let bestX = 0, bestY = 0, maxDist = -1;
+      // Sample 30 random spots and pick the one furthest from all existing spawns
+      for (let j = 0; j < 30; j++) {
+        const tx = margin + getRnd(GRID_W - margin * 2);
+        const ty = margin + getRnd(GRID_H - margin * 2);
+        const minDistToOthers = pts.length === 0 ? 100 : Math.min(...pts.map(p => Math.hypot(p.x - tx, p.y - ty)));
+        if (minDistToOthers > maxDist) {
+          maxDist = minDistToOthers;
+          bestX = tx;
+          bestY = ty;
+        }
+      }
+      pts.push({ x: bestX, y: bestY });
+      spawn(i + 1, bestX, bestY);
+    }
+  }
+
+  const bots = [];
+  if(settings.botCount>=1) bots.push(makeEnt(2,'Alpha'));
+  if(settings.botCount>=2) bots.push(makeEnt(3,'Beta'));
+  if(settings.botCount>=3) bots.push(makeEnt(4,'Gamma'));
+  
+  return {grid:g,tickCount:0,settings,player:makeEnt(1,'You'),bots,buildings:[],units:[], brShrink: 0};
 };
 
 // Helper to convert hex color to RGB object
 const hexToRgb = hex => {
-  const bigint = parseInt(hex.slice(1), 16);
+  const bigint = parseInt(hex.replace('#',''), 16);
   const r = (bigint >> 16) & 255;
   const g = (bigint >> 8) & 255;
   const b = bigint & 255;
@@ -137,6 +232,37 @@ const hexToRgb = hex => {
 
 // The specific gray in your pixel art to be replaced (#646464)
 const PLACEHOLDER_GRAY_RGB = { r: 100, g: 100, b: 100 };
+
+
+// ─── Image → Grid Parser ──────────────────────────────────────────────────────
+// Reads pixel data from an uploaded image and converts it into a GRID_W×GRID_H
+// game grid. Brightness is used as the terrain signal:
+//   • Very dark pixels  (brightness < darkThresh)  → obstacle  (9)
+//   • Very light pixels (brightness > lightThresh)  → open land (0)
+//   • Mid-range pixels                              → open land (0)  [configurable]
+// The image is sampled at GRID_W × GRID_H sample points via a temporary canvas.
+const parseImageToGrid = (imgElement, darkThreshold = 60, lightThreshold = 200) => {
+  const tmpCanvas = document.createElement('canvas');
+  tmpCanvas.width  = GRID_W;
+  tmpCanvas.height = GRID_H;
+  const ctx = tmpCanvas.getContext('2d');
+  // Disable smoothing so we get hard pixel boundaries when downscaling
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(imgElement, 0, 0, GRID_W, GRID_H);
+
+  const { data } = ctx.getImageData(0, 0, GRID_W, GRID_H);
+  const grid = Array.from({ length: GRID_H }, (_, y) =>
+    Array.from({ length: GRID_W }, (_, x) => {
+      const idx = (y * GRID_W + x) * 4;
+      const r = data[idx], g = data[idx + 1], b = data[idx + 2];
+      // Perceived brightness (ITU-R BT.709)
+      const brightness = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      // Very dark → obstacle, everything else → walkable
+      return brightness < darkThreshold ? 9 : 0;
+    })
+  );
+  return grid;
+};
 
 // Helper to generate a recolored version of a sprite once
 const createRecoloredCanvas = (image, ownerColorHex, placeholderRgb) => {
@@ -174,8 +300,31 @@ export default function App() {
   const [activeBucket,setActiveBucket] = useState(()=>Number(localStorage.getItem('activeBucket')||0));
   const [unlockedBucket,setUnlockedBucket] = useState(()=>Number(localStorage.getItem('unlockedBucket')||0));
   const [gameStatus,setGameStatus]   = useState('menu');
-  const [settings,setSettings]       = useState({duration:0,botCount:3,difficulty:'normal'});
+  const [customMap,setCustomMap]     = useState(()=>{
+    const saved = localStorage.getItem('customMap');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [customBG, setCustomBG] = useState(() => localStorage.getItem('customBG'));
+  const [settings,setSettings]       = useState({
+    duration:0,
+    botCount:3,
+    difficulty:'normal',
+    mapType:'procedural',
+    gameMode: 'classic',
+    seed: Math.random().toString(36).substring(7),
+    terrainDensity: 20,
+    terrainType: 'scattered',
+    darkThreshold: 60,
+    continentType: 'pangea',
+    passableObstacles: false,
+    customMapName: 'New Arena',
+    colors: { ...MAP_SETTINGS.colors }
+  });
   const [menuTab,setMenuTab]         = useState('setup');
+  const [editorSubTab, setEditorSubTab] = useState('terrain'); // 'terrain', 'design', 'teams'
+  const [editorTool, setEditorTool] = useState('obstacle'); // 'obstacle' | 'erase' | 'spawn1' | 'spawn2'
+  const [editorBrush, setEditorBrush] = useState(1); // 1, 2, 3 cell radius
+  const editorBotCycle = useRef(2); // cycles 2,3,4 for multi-bot spawn placement
   // Popup: { type:'milbase', building: {...} } or null
   const [popup,setPopup]             = useState(null);
 
@@ -209,42 +358,53 @@ export default function App() {
 
   // Load all sprite images
   useEffect(() => {
-    const allSpritePaths = [
+    const spritePaths = [
       ...Object.values(BLDG).map(b => b.sprite),
       ...Object.values(UNITS).map(u => u.sprite),
     ];
+
+    // Prepare a list of all images: sprites and assets use absolute URL strings from the public folder
+    const imagesToLoad = [
+      ...spritePaths.map(path => ({ key: path, src: getTexture(path) })),
+      ...Object.entries(MAP_SETTINGS.assets || {}).map(([key, src]) => ({ key, src: getTexture(src) }))
+    ];
+
+    // If a custom background exists in localStorage, override the default
+    if (customBG) {
+      const bgIdx = imagesToLoad.findIndex(i => i.key === 'background');
+      if (bgIdx !== -1) imagesToLoad[bgIdx].src = customBG;
+    }
+
     const images = {};
     let loadedCount = 0;
-    const totalImages = allSpritePaths.length;
+    const totalImages = imagesToLoad.length;
 
     if (totalImages === 0) { setImagesLoaded(true); return; }
 
-    allSpritePaths.forEach(path => {
+    imagesToLoad.forEach(({ key, src }) => {
       const img = new Image();
-      // Required for getImageData/pixel manipulation
-      img.crossOrigin = "anonymous"; 
-      // Use absolute path from public folder
-      img.src = `/Assets/Textures/${path}`;
-
+      img.crossOrigin = "anonymous";
+      img.src = src;
       img.onload = () => {
-        images[path] = img;
+        images[key] = img;
         loadedCount++;
         if (loadedCount === totalImages) { setLoadedImages(images); setImagesLoaded(true); }
       };
       img.onerror = () => {
-        console.error(`Failed to load sprite at: /Assets/Textures/${path}. Check if file is in public/Assets/Textures/`);
-        loadedCount++; if (loadedCount === totalImages) { setLoadedImages(images); setImagesLoaded(true); }
+        console.error(`Failed to load asset: ${src}`);
+        loadedCount++;
+        if (loadedCount === totalImages) { setLoadedImages(images); setImagesLoaded(true); }
       };
     });
-  }, []);
+  }, [customBG]);
 
   const addCocoa = useCallback(n=>{
     setCocoaBeans(p=>{const nv=p+n; return nv;});
-  },[]);
+  }, []);
 
   // Fast draw using the cache
   const drawSprite = (ctx, path, x, y, ownerId, w, h, anim = { scaleX:1, scaleY:1, rotation:0, offsetY:0 }) => {
-    const color = COLORS[ownerId];
+    const color = settings.colors[ownerId] || COLORS[ownerId];
     const cacheKey = `${path}-${color}`;
     
     if (!spriteCache.current.has(cacheKey)) {
@@ -306,7 +466,7 @@ export default function App() {
       leaderboard:all.filter(x=>x.pixels>0).sort((a,b)=>b.pixels-a.pixels)
         .map(x=>({id:x.id,name:x.name,pixels:x.pixels,color:x.color}))
     });
-  },[]);
+  }, []);
 
   // Redraw the static-ish grid layer to the off-screen cache
   const updateGridCache = useCallback(() => {
@@ -315,32 +475,44 @@ export default function App() {
     const { grid } = stateRef.current;
     const CS = CELL_SIZE;
 
-    gCtx.fillStyle = COLORS[0];
+    // Use black for custom maps to support transparent backgrounds, otherwise use the terrain color
+    gCtx.fillStyle = settings.mapType === 'custom' ? '#000000' : settings.colors[0];
     gCtx.fillRect(0, 0, GRID_W * CS, GRID_H * CS);
+
+    // Draw custom background image if it exists
+    const bgImg = loadedImages['background'];
+    if (bgImg) {
+      gCtx.drawImage(bgImg, 0, 0, GRID_W * CS, GRID_H * CS);
+    }
 
     for (let y = 0; y < GRID_H; y++) {
       for (let x = 0; x < GRID_W; x++) {
         const c = grid[y][x];
         if (c === 0) continue;
-        if (c === 9) { gCtx.fillStyle = COLORS[9]; gCtx.fillRect(x * CS, y * CS, CS, CS); continue; }
+        if (c === 9) { gCtx.fillStyle = settings.colors[9]; gCtx.fillRect(x * CS, y * CS, CS, CS); continue; }
         if (isFortWall(c)) {
           const ownId = fortWallOwner(c);
-          gCtx.fillStyle = COLORS[ownId];
+          gCtx.fillStyle = settings.colors[ownId];
           gCtx.fillRect(x * CS, y * CS, CS, CS);
           gCtx.fillStyle = 'rgba(0,0,0,0.2)';
           gCtx.fillRect(x * CS, y * CS, CS, CS);
           continue;
         }
-        gCtx.fillStyle = COLORS[c];
+        gCtx.fillStyle = settings.colors[c];
         gCtx.fillRect(x * CS, y * CS, CS, CS);
       }
+    }
+    // Draw BR Zone
+    if (stateRef.current.settings.gameMode === 'br' && stateRef.current.brShrink > 0) {
+      gCtx.fillStyle = 'rgba(239, 68, 68, 0.2)';
+      gCtx.fillRect(0, 0, GRID_W * CS, stateRef.current.brShrink * CS);
     }
     // Grid lines
     gCtx.strokeStyle = 'rgba(0,0,0,0.03)'; gCtx.lineWidth = 0.5; gCtx.beginPath();
     for (let y = 0; y <= GRID_H; y++) { gCtx.moveTo(0, y * CS); gCtx.lineTo(GRID_W * CS, y * CS); }
     for (let x = 0; x <= GRID_W; x++) { gCtx.moveTo(x * CS, 0); gCtx.lineTo(x * CS, GRID_H * CS); }
     gCtx.stroke();
-  }, []);
+  }, [loadedImages, settings]);
 
   // ── Draw ───────────────────────────────────────────────────────────────────
   const drawCanvas = useCallback(()=>{
@@ -398,7 +570,6 @@ export default function App() {
       const uy = u.visualY * CS;
 
       // ── Procedural Animation ──
-      // Animation is strong when moving, subtle "breathing" when idle
       const animIntensity = isMoving ? 1.0 : 0.2;
       const bob = Math.sin(time / 150 + u.id) * (isMoving ? 3 : 0.5);
       const squash = 1 + Math.sin(time / 150 + u.id) * (0.08 * animIntensity);
@@ -413,13 +584,13 @@ export default function App() {
       ctx.fillStyle=hf>0.5?'#4ade80':'#f87171';
       ctx.fillRect(ux,uy,Math.floor(CS*hf),2);
       if(u.shootFlash>0){
-        ctx.save();ctx.globalAlpha=u.shootFlash/5;ctx.fillStyle=COLORS[u.ownerId];
+        ctx.save();ctx.globalAlpha=u.shootFlash/5;ctx.fillStyle=settings.colors[u.ownerId];
         const[dy,dx]=u.dir||[0,1];
         ctx.beginPath();ctx.arc((u.x+dx)*CS+CS/2,(u.y+dy)*CS+CS/2,CS/2,0,Math.PI*2);
         ctx.fill();ctx.restore();u.shootFlash=Math.max(0,u.shootFlash-1);
       }
     }
-  }, [imagesLoaded, loadedImages]);
+  }, [imagesLoaded, loadedImages, settings.colors]);
 
   // ── Game Logic ─────────────────────────────────────────────────────────────
   const updateLogic = useCallback(()=>{
@@ -570,7 +741,7 @@ export default function App() {
           if(ny<0||ny>=GRID_H||nx<0||nx>=GRID_W)continue;
           const cell=state.grid[ny][nx];
           // Can attack enemy territory, fort walls (demo only breaks walls), neutral
-          if(!isOwned(cell,u.ownerId)&&cell!==9) tgts.push({y:ny,x:nx,dy,dx});
+          if(!isOwned(cell,u.ownerId)&&(cell!==9 || state.settings.passableObstacles)) tgts.push({y:ny,x:nx,dy,dx});
         }
 
         if(tgts.length>0){
@@ -596,7 +767,7 @@ export default function App() {
             if(isFortWall(cell)){
               if(u.type==='demo'){
                 // Damage the fort building itself
-                const fortBldIdx=state.buildings.findIndex(b=>{
+                const fortBldIdx=state.buildings.findIndex(b => {
                   if(b.type !== 'fort' || b.ownerId !== fortWallOwner(cell)) return false;
                   const bw = BLDG.fort.w, bh = BLDG.fort.h;
                   // Check if this specific wall tile is part of this fort's perimeter
@@ -612,7 +783,8 @@ export default function App() {
             const bldIdx=state.buildings.findIndex(b => {
               const bw = BLDG[b.type].w || 1;
               const bh = BLDG[b.type].h || 1;
-              return b.ownerId !== u.ownerId && t.x >= b.x && t.x < b.x + bw && t.y >= b.y && t.y < b.y + bh;
+              const isEnemy = state.isAlly ? !state.isAlly(b.ownerId, u.ownerId) : b.ownerId !== u.ownerId;
+              return isEnemy && t.x >= b.x && t.x < b.x + bw && t.y >= b.y && t.y < b.y + bh;
             });
             if(bldIdx>=0){
               // Tower defense shoots back!
@@ -623,8 +795,10 @@ export default function App() {
               damageBuilding(bldIdx,u.ownerId);
               hit++;
             } else {
-              // Attack enemy unit on tile
-              const enemyUnit=state.units.find(eu=>eu.x===t.x&&eu.y===t.y&&eu.ownerId!==u.ownerId);
+              const enemyUnit=state.units.find(eu => {
+                const isEnemy = state.isAlly ? !state.isAlly(eu.ownerId, u.ownerId) : eu.ownerId !== u.ownerId;
+                return eu.x===t.x&&eu.y===t.y&&isEnemy;
+              });
               if(enemyUnit){
                 enemyUnit.hp-=uData.atk;
                 enemyUnit.damageFlash=4;
@@ -683,22 +857,22 @@ export default function App() {
     state.buildings=state.buildings.filter(b=>isOwned(state.grid[b.y]?.[b.x],b.ownerId));
 
     if(state.tickCount%2===0){ syncUI(); updateGridCache(); }
-  },[syncUI,addCocoa]);
+  }, [syncUI, addCocoa, updateGridCache]);
 
   // ── Engine ─────────────────────────────────────────────────────────────────
   useEffect(()=>{
-    if(gameStatus!=='playing')return;
-    const ti=setInterval(updateLogic,TICK_RATE);
+    if(gameStatus!=='playing' && gameStatus!=='editor')return;
+    const ti=gameStatus==='playing' ? setInterval(updateLogic,TICK_RATE) : null;
     const rf=()=>{drawCanvas();requestRef.current=requestAnimationFrame(rf);};
     requestRef.current=requestAnimationFrame(rf);
     const up=()=>{isMouseDown.current=false;};
     window.addEventListener('mouseup',up);
-    return()=>{clearInterval(ti);cancelAnimationFrame(requestRef.current);window.removeEventListener('mouseup',up);};
+    return()=>{if(ti)clearInterval(ti);cancelAnimationFrame(requestRef.current);window.removeEventListener('mouseup',up);};
   },[gameStatus,updateLogic,drawCanvas]);
 
   // ── Canvas click - paint + milbase popup ──────────────────────────────────
   const handleCanvasClick = useCallback((e,isDown)=>{
-    if(gameStatus!=='playing')return;
+    if(gameStatus!=='playing' && gameStatus!=='editor')return;
     const rect=canvasRef.current.getBoundingClientRect();
     const sx=canvasRef.current.width/rect.width,sy=canvasRef.current.height/rect.height;
     const cx=Math.floor(((e.clientX-rect.left)*sx)/CELL_SIZE);
@@ -712,6 +886,41 @@ export default function App() {
       if(milbase){setPopup({type:'milbase',building:milbase});return;}
     }
 
+    // Editor Mode
+    if(gameStatus==='editor'){
+      const brush = editorBrush;
+      for(let dy=-(brush-1); dy<=(brush-1); dy++){
+        for(let dx=-(brush-1); dx<=(brush-1); dx++){
+          const ex=cx+dx, ey=cy+dy;
+          if(ex<0||ex>=GRID_W||ey<0||ey>=GRID_H) continue;
+          if(editorTool==='obstacle'){
+            state.grid[ey][ex] = 9;
+          } else if(editorTool==='erase'){
+            state.grid[ey][ex] = 0;
+          } else if(editorTool==='spawn1'){
+            // Only paint in the center click (brush ignored for spawn — place 3x3 cluster)
+            if(dy===0&&dx===0){
+              for(let sy=-1;sy<=1;sy++) for(let sx=-1;sx<=1;sx++){
+                const nx2=cx+sx, ny2=cy+sy;
+                if(nx2>=0&&nx2<GRID_W&&ny2>=0&&ny2<GRID_H) state.grid[ny2][nx2]=1;
+              }
+            }
+          } else if(editorTool==='spawn2'){
+            if(dy===0&&dx===0){
+              const botId = editorBotCycle.current;
+              for(let sy=-1;sy<=1;sy++) for(let sx=-1;sx<=1;sx++){
+                const nx2=cx+sx, ny2=cy+sy;
+                if(nx2>=0&&nx2<GRID_W&&ny2>=0&&ny2<GRID_H) state.grid[ny2][nx2]=botId;
+              }
+              editorBotCycle.current = botId>=4 ? 2 : botId+1;
+            }
+          }
+        }
+      }
+      updateGridCache();
+      return;
+    }
+
     // Paint
     if(!isMouseDown.current&&!isDown)return;
     if(state.player.paintUnits<=0)return;
@@ -721,7 +930,7 @@ export default function App() {
       const x=cx+dx,y=cy+dy;
       if(x<0||x>=GRID_W||y<0||y>=GRID_H)continue;
       if(isOwned(state.grid[y][x],1))continue;
-      if(state.grid[y][x]===9)continue;
+      if(state.grid[y][x]===9 && !settings.passableObstacles)continue;
       if(state.player.paintUnits<=0)break;
       // Fort walls block player paint (unless demo unit later breaks them)
       if(isFortWall(state.grid[y][x]))continue;
@@ -753,11 +962,11 @@ export default function App() {
     }
     if(painted.length>0){
       const ctx=canvasRef.current.getContext('2d');
-      ctx.fillStyle=COLORS[1];
+      ctx.fillStyle=settings.colors[1];
       for(const p of painted)ctx.fillRect(p.x*CELL_SIZE,p.y*CELL_SIZE,CELL_SIZE,CELL_SIZE);
       syncUI();
     }
-  },[gameStatus,syncUI,addCocoa]);
+  },[gameStatus,syncUI,addCocoa,updateGridCache,editorTool,editorBrush]);
 
   // ── Purchase helpers ───────────────────────────────────────────────────────
   const handleCraftPaint=()=>{
@@ -829,14 +1038,78 @@ export default function App() {
     setPopup(null); syncUI();
   };
 
-  const buyBucketUpgrade=()=>{
-    const next=bucketLevel+1; if(next>=BUCKET_UPGRADES.length)return;
-    const cost=BUCKET_UPGRADES[next].cocoaCost; if(cocoaBeans<cost)return;
-    setCocoaBeans(p=>{const nv=p-cost;localStorage.setItem('cocoaBeans',nv);return nv;});
-    setBucketLevel(next);
+
+
+  const startGame=()=>{
+    stateRef.current=createInitialState(settings, customMap);
+    setGameStatus('playing');
+    syncUI();
+    updateGridCache();
   };
 
-  const startGame=()=>{stateRef.current=createInitialState(settings);setGameStatus('playing');syncUI();};
+  const enterEditor=()=>{
+    stateRef.current = { 
+      grid: customMap ? customMap.map(r=>[...r]) : Array.from({length:GRID_H},()=>Array(GRID_W).fill(0)),
+      buildings: [], units: [],
+      settings: { ...settings, gameMode: 'classic' }
+    };
+    updateGridCache();
+    setGameStatus('editor');
+  };
+
+  const saveEditor=()=>{
+    const g = stateRef.current.grid;
+    setCustomMap(g.map(r=>[...r]));
+    localStorage.setItem('customMap', JSON.stringify(g));
+    setGameStatus('menu');
+  };
+
+  // Upload image as visual background only
+  const handleBGUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target.result;
+      localStorage.setItem('customBG', base64);
+      setCustomBG(base64);
+      const img = new Image();
+      img.src = base64;
+      img.onload = () => setLoadedImages(prev => ({ ...prev, background: img }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Upload image and PARSE it into the game grid using pixel brightness
+  const handleMapImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target.result;
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.src = base64;
+      img.onload = () => {
+        // Parse pixel data → grid
+        const parsedGrid = parseImageToGrid(img, settings.darkThreshold ?? 60);
+        // Also set as background so you can see it in-game
+        localStorage.setItem('customBG', base64);
+        setCustomBG(base64);
+        setLoadedImages(prev => ({ ...prev, background: img }));
+        // Save grid as custom map
+        setCustomMap(parsedGrid);
+        localStorage.setItem('customMap', JSON.stringify(parsedGrid));
+        // Switch to custom map type automatically
+        setSettings(s => ({ ...s, mapType: 'custom' }));
+      };
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Keep old name as alias for any remaining references
+  const handleImageUpload = handleBGUpload;
+
   const formatTime=t=>{const s=Math.max(0,settings.duration-Math.floor(t/10));return`${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;};
   const togglePanel=p=>setPanelOpen(prev=>({units:false,buildings:false,[p]:!prev[p]}));
   const paintPerClick=Math.floor(4*(1+ui.factories)*(1+0.2*ui.infrastructures));
@@ -921,7 +1194,7 @@ export default function App() {
                     const canBuy=gameStatus==='playing'&&!locked&&!noBase&&ui.potatoes>=cost;
                     return(
                       <div key={type} className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all ${locked?'border-purple-200 bg-purple-50':noBase?'border-slate-200 bg-slate-50':'border-slate-200 bg-slate-50'}`}>
-                        <img src={`/Assets/Textures/${uDef.sprite}`} alt={type} className="w-6 h-6 object-contain" />
+                        <img src={getTexture(uDef.sprite)} alt={type} className="w-6 h-6 object-contain" />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="text-xs font-black text-slate-700 capitalize">{type}</span>
@@ -966,7 +1239,7 @@ export default function App() {
                     return(
                       <button key={type} onClick={cb} disabled={!canBuy}
                         className={`flex flex-col items-center p-3 rounded-xl border-b-4 transition-all active:translate-y-1 active:border-b-0 ${canBuy?cls[color]+' text-white':'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'}`}>
-                        <img src={`/Assets/Textures/${def.sprite}`} alt={type} className="w-8 h-8 mb-1 object-contain" />
+                        <img src={getTexture(def.sprite)} alt={type} className="w-8 h-8 mb-1 object-contain" />
                         <span className="text-[11px] font-black capitalize">{type==='milbase'?'Mil.Base':type}</span>
                         <span className="text-[9px] opacity-80">{def.desc}</span>
                         <span className="text-[9px] opacity-50 mb-1">HP:{def.hp}</span>
@@ -1017,7 +1290,7 @@ export default function App() {
             <div className="absolute top-4 right-4 w-72 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-40 animate-in fade-in zoom-in duration-200">
               <div className="bg-slate-800 p-3 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <img src="/Assets/Textures/milbase.png" alt="Milbase" className="w-6 h-6"/>
+                  <img src={getTexture('milbase.png')} alt="Milbase" className="w-6 h-6"/>
                   <span className="text-white font-bold text-sm">Military Ops</span>
                 </div>
                 <button onClick={()=>setPopup(null)} className="text-slate-400 hover:text-white"><X size={18}/></button>
@@ -1027,7 +1300,7 @@ export default function App() {
                   <div className="font-bold text-slate-500 uppercase tracking-tight">Available Units:</div>
                   {Object.entries(UNITS).map(([k,v])=>(
                     <div key={k} className={`flex items-center gap-2 ${v.advanced&&!ui.milbaseAdvanced?'opacity-40':''}`}>
-                      <img src={`/Assets/Textures/${v.sprite}`} alt={k} className="w-3.5 h-3.5"/>
+                      <img src={getTexture(v.sprite)} alt={k} className="w-3.5 h-3.5"/>
                       <span className="font-bold text-slate-700">{k}</span>
                       {v.advanced&&<span className="text-[8px] text-purple-500 font-bold">[ADV]</span>}
                     </div>
@@ -1053,6 +1326,9 @@ export default function App() {
                   <button onClick={()=>setMenuTab('setup')} className={`flex-1 py-3.5 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${menuTab==='setup'?'text-blue-600 border-b-2 border-blue-600 bg-blue-50/40':'text-slate-500 hover:bg-slate-50'}`}>
                     <Settings size={14}/> Game Setup
                   </button>
+                  <button onClick={()=>setMenuTab('editor')} className={`flex-1 py-3.5 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${menuTab==='editor'?'text-emerald-600 border-b-2 border-emerald-600 bg-emerald-50/40':'text-slate-500 hover:bg-slate-50'}`}>
+                    <Building2 size={14}/> Map Editor
+                  </button>
                   <button onClick={()=>setMenuTab('upgrade')} className={`flex-1 py-3.5 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${menuTab==='upgrade'?'text-amber-600 border-b-2 border-amber-500 bg-amber-50/40':'text-slate-500 hover:bg-slate-50'}`}>
                     <ShoppingBag size={14}/> Upgrade Shop
                     <span className="bg-amber-100 text-amber-700 text-[10px] font-black px-1.5 py-0.5 rounded-full">🫘{fmt(cocoaBeans)}</span>
@@ -1066,6 +1342,8 @@ export default function App() {
                           {label:'Duration',icon:<Clock size={14}/>,key:'duration',opts:[{v:0,l:'Endless'},{v:120,l:'2 min'},{v:300,l:'5 min'}]},
                           {label:'Bots',icon:<Settings size={14}/>,key:'botCount',opts:[{v:1,l:'1 Enemy'},{v:2,l:'2 Enemies'},{v:3,l:'3 Enemies'}]},
                           {label:'Difficulty',icon:<Shield size={14}/>,key:'difficulty',opts:[{v:'easy',l:'Easy'},{v:'normal',l:'Normal'},{v:'hard',l:'Hard'}]},
+                          {label:'Map Mode',icon:<Building2 size={14}/>,key:'mapType',opts:[{v:'procedural',l:'Procedural'},{v:'realistic',l:'Realistic'},{v:'custom',l:'Custom Map'}]},
+                          {label:'Game Mode',icon:<Star size={14}/>,key:'gameMode',opts:[{v:'classic',l:'Classic'},{v:'br',l:'Battle Royale'},{v:'teams',l:'2v2 Teams'}]},
                         ].map(({label,icon,key,opts})=>(
                           <div key={key} className="flex items-center justify-between">
                             <label className="font-bold text-slate-600 flex items-center gap-2 text-sm">{icon} {label}</label>
@@ -1081,6 +1359,183 @@ export default function App() {
                         <Play fill="currentColor" size={18}/> START PAINTING
                       </button>
                     </>
+                  )}
+                  {menuTab==='editor'&&(
+                    <div className="space-y-3">
+                      {/* Sub-tab Navigation */}
+                      <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
+                        {['terrain', 'design', 'teams'].map(t => (
+                          <button key={t} onClick={() => setEditorSubTab(t)} 
+                            className={`flex-1 py-2 text-[10px] font-black uppercase tracking-widest rounded-lg transition-all ${editorSubTab === t ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}>
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+
+                      {editorSubTab === 'terrain' && (
+                        <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2">
+                          <div className="flex gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200">
+                            {[{id:'procedural',label:'🎲 Procedural'},{id:'realistic',label:'🌍 Realistic'},{id:'custom',label:'✍️ Custom'}].map(m=>(
+                              <button key={m.id} onClick={()=>setSettings(s=>({...s,mapType:m.id}))}
+                                className={`flex-1 py-1.5 rounded-lg text-[10px] font-black transition-all ${settings.mapType===m.id?'bg-white text-emerald-700 shadow-sm':'text-slate-400 hover:text-slate-600'}`}>
+                                {m.label}
+                              </button>
+                            ))}
+                          </div>
+
+                          <div className="bg-white border border-slate-200 rounded-xl p-3">
+                            {/* Unique Configuration for Procedural */}
+                            {settings.mapType === 'procedural' && (
+                              <div className="space-y-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] font-black text-slate-400 uppercase">Generation Seed</label>
+                                    <input type="text" value={settings.seed} onChange={e=>setSettings(s=>({...s, seed: e.target.value}))} className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs font-mono"/>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] font-black text-slate-400 uppercase">Terrain Type</label>
+                                    <select value={settings.terrainType} onChange={e=>setSettings(s=>({...s, terrainType: e.target.value}))} className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs">
+                                      <option value="scattered">Scattered Dots</option>
+                                      <option value="grouped">Large Groups</option>
+                                      <option value="maze">Maze Pathing</option>
+                                    </select>
+                                  </div>
+                                </div>
+                                <div className="space-y-1 border-t border-slate-50 pt-2">
+                                  <div className="flex justify-between items-center">
+                                    <label className="text-[9px] font-black text-slate-400 uppercase">Obstacle Density</label>
+                                    <span className="text-[10px] font-bold text-emerald-600">{settings.terrainDensity}%</span>
+                                  </div>
+                                  <input type="range" min="5" max="50" value={settings.terrainDensity} onChange={e=>setSettings(s=>({...s, terrainDensity: parseInt(e.target.value)}))} className="w-full accent-emerald-500 h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer"/>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Unique Configuration for Realistic */}
+                            {settings.mapType === 'realistic' && (
+                              <div className="space-y-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] font-black text-slate-400 uppercase">Generation Seed</label>
+                                    <input type="text" value={settings.seed} onChange={e=>setSettings(s=>({...s, seed: e.target.value}))} className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs font-mono"/>
+                                  </div>
+                                  <div className="space-y-1">
+                                    <label className="text-[9px] font-black text-slate-400 uppercase">Continent Map</label>
+                                    <select value={settings.continentType} onChange={e=>setSettings(s=>({...s, continentType: e.target.value}))} className="w-full bg-slate-50 border border-slate-200 rounded px-2 py-1 text-xs">
+                                      <option value="pangea">Pangea (Center)</option>
+                                      <option value="archipelago">Archipelago (Islands)</option>
+                                    </select>
+                                  </div>
+                                </div>
+                                <div className="space-y-1 border-t border-slate-50 pt-2">
+                                  <label className="text-[9px] font-black text-slate-400 uppercase">Landmass Scale</label>
+                                  <input type="range" min="5" max="50" value={settings.terrainDensity} onChange={e=>setSettings(s=>({...s, terrainDensity: parseInt(e.target.value)}))} className="w-full accent-emerald-500 h-1.5 bg-slate-100 rounded-lg appearance-none cursor-pointer"/>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Unique Configuration for Custom Map */}
+                            {settings.mapType === 'custom' && (
+                              <div className="space-y-3">
+                                {/* Primary action: import image as playable map */}
+                                <div className="space-y-1.5">
+                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Import Image as Map</label>
+                                  <p className="text-[9px] text-slate-400 leading-relaxed">Dark pixels → obstacles. Light pixels → open land. Avoid pure black/white.</p>
+                                  <label className="w-full cursor-pointer bg-emerald-50 hover:bg-emerald-100 border-2 border-dashed border-emerald-300 rounded-xl py-3 text-xs font-bold text-emerald-700 flex items-center justify-center gap-2 transition-colors">
+                                    <ArrowUp size={14}/> {customMap ? '↺ Re-import Image as Map' : '📷 Import Image → Generate Grid'}
+                                    <input type="file" accept="image/*" className="hidden" onChange={handleMapImageUpload}/>
+                                  </label>
+                                </div>
+
+                                {/* Dark threshold slider */}
+                                <div className="space-y-1 bg-slate-50 rounded-lg px-3 py-2 border border-slate-100">
+                                  <div className="flex justify-between items-center">
+                                    <label className="text-[9px] font-black text-slate-400 uppercase">Dark Threshold (obstacles)</label>
+                                    <span className="text-[10px] font-bold text-emerald-600">{settings.darkThreshold ?? 60}</span>
+                                  </div>
+                                  <input type="range" min="20" max="180" value={settings.darkThreshold ?? 60}
+                                    onChange={e=>setSettings(s=>({...s, darkThreshold: parseInt(e.target.value)}))}
+                                    className="w-full accent-emerald-500 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer"/>
+                                  <div className="flex justify-between text-[8px] text-slate-300 font-bold">
+                                    <span>Fewer walls</span><span>More walls</span>
+                                  </div>
+                                </div>
+
+                                {/* Secondary: visual background only */}
+                                <div className="space-y-1">
+                                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Background Skin (visual only)</label>
+                                  <div className="flex gap-2">
+                                    <label className="flex-1 cursor-pointer bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg py-1.5 text-[10px] font-bold text-slate-500 flex items-center justify-center gap-1.5 transition-colors">
+                                      <ArrowUp size={12}/> {customBG ? 'Change BG Image' : 'Upload BG Image'}
+                                      <input type="file" accept="image/*" className="hidden" onChange={handleBGUpload}/>
+                                    </label>
+                                    {customBG && <button onClick={()=>{setCustomBG(null);localStorage.removeItem('customBG');}} className="bg-red-50 hover:bg-red-100 text-red-400 px-3 rounded-lg text-xs font-bold transition-colors"><X size={12}/></button>}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-lg px-3 py-2">
+                                  <label className="flex items-center gap-3 cursor-pointer w-full group">
+                                    <input 
+                                      type="checkbox" 
+                                      checked={settings.passableObstacles} 
+                                      onChange={() => setSettings(s => ({ ...s, passableObstacles: !s.passableObstacles }))}
+                                      className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 transition-colors"
+                                    />
+                                    <span className="text-[10px] font-bold text-slate-700 group-hover:text-slate-900">Obstacles are Passable</span>
+                                  </label>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {editorSubTab === 'design' && (
+                        <div className="space-y-3 animate-in fade-in slide-in-from-bottom-2">
+                          <div className="bg-white border border-slate-200 rounded-xl p-3 space-y-3">
+                            <div className="flex flex-col">
+                              <label className="text-[9px] font-black text-slate-400 uppercase mb-1">Arena Metadata</label>
+                              <input type="text" value={settings.customMapName} onChange={e=>setSettings(s=>({...s, customMapName: e.target.value}))} placeholder="Map Name..." className="w-full text-sm font-bold text-slate-700 focus:outline-none mb-3 bg-slate-50 px-2 py-1.5 rounded-lg"/>
+                            </div>
+                            <div className="flex gap-2">
+                              <button onClick={enterEditor} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors">
+                                <Building2 size={14}/> Layout Editor
+                              </button>
+                            </div>
+                          </div>
+                          
+                          {settings.mapType === 'custom' && customMap && (
+                            <div className="bg-slate-50 rounded-xl p-2 border border-slate-200 overflow-hidden">
+                              <div className="aspect-[60/40] bg-white rounded-lg flex flex-wrap shadow-inner" style={{imageRendering: 'pixelated'}}>
+                                {customMap.map((row, y) => y % 4 === 0 && row.map((cell, x) => x % 4 === 0 && (
+                                  <div key={`${x}-${y}`} className="w-[6.66%] h-[10%]" style={{backgroundColor: settings.colors[cell] || '#f1f5f9'}}/>
+                                )))}
+                              </div>
+                              <div className="mt-1.5 flex justify-between text-[8px] font-bold text-slate-400 uppercase px-1">
+                                <span>Preview</span>
+                                <span>{GRID_W} × {GRID_H} max</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {editorSubTab === 'teams' && (
+                        <div className="bg-white border border-slate-200 rounded-xl p-4 animate-in fade-in slide-in-from-bottom-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase block mb-3">Team Palette</label>
+                          <div className="flex gap-2">
+                            {[1,2,3,4].map(id=>(
+                              <div key={id} className="flex flex-col items-center gap-0.5">
+                                <input type="color" value={settings.colors[id]} onChange={e=>setSettings(s=>({...s,colors:{...s.colors,[id]:e.target.value}}))} className="w-7 h-7 rounded cursor-pointer border-0 p-0 bg-transparent"/>
+                                <span className="text-[8px] font-black text-slate-400">P{id}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {customMap&&<button onClick={()=>{setCustomMap(null);localStorage.removeItem('customMap');}} className="w-full text-[10px] text-slate-400 hover:text-red-500 font-bold transition-colors text-center">✕ Reset custom map</button>}
+                    </div>
                   )}
                   {menuTab==='upgrade'&&(
                     <div className="space-y-4">
@@ -1132,7 +1587,7 @@ export default function App() {
                         <div className="space-y-1">
                           {Object.entries(BLDG).map(([type,def])=>(
                             <div key={type} className="flex justify-between text-xs text-amber-700">
-                              <span className="flex items-center gap-1.5"><img src={`/Assets/Textures/${def.sprite}`} alt={type} className="w-3 h-3" /> Destroy {type}</span>
+                              <span className="flex items-center gap-1.5"><img src={getTexture(def.sprite)} alt={type} className="w-3 h-3" /> Destroy {type}</span>
                               <span className="font-bold">+{def.cocoaReward} 🫘</span>
                             </div>
                           ))}
@@ -1141,6 +1596,52 @@ export default function App() {
                     </div>
                   )}
                 </div>
+              </div>
+            </div>
+          )}
+
+          {/* Editor Mode Overlay */}
+          {gameStatus==='editor' && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 bg-white/97 backdrop-blur-sm rounded-2xl shadow-2xl border border-slate-200 z-50 flex flex-col" style={{minWidth:'640px'}}>
+              {/* Top bar */}
+              <div className="flex items-center gap-3 px-4 py-2.5 border-b border-slate-100">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">🗺️ Map Editor</span>
+                <div className="h-4 w-px bg-slate-200"/>
+                {/* Tool selector */}
+                {[
+                  {id:'obstacle', label:'🧱 Obstacle', title:'Draw walls/rocks'},
+                  {id:'erase',    label:'🧹 Erase',    title:'Remove any tile'},
+                  {id:'spawn1',   label:'🔵 P1 Spawn', title:'Set player 1 start zone'},
+                  {id:'spawn2',   label:'🔴 Bot spawn', title:'Set bot start zones'},
+                ].map(tool=>(
+                  <button key={tool.id} title={tool.title}
+                    onClick={()=>setEditorTool(tool.id)}
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${editorTool===tool.id?'bg-slate-800 text-white shadow':'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                    {tool.label}
+                  </button>
+                ))}
+                <div className="h-4 w-px bg-slate-200"/>
+                {/* Brush size */}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold text-slate-400">Brush</span>
+                  {[1,2,3].map(s=>(
+                    <button key={s} onClick={()=>setEditorBrush(s)}
+                      className={`w-6 h-6 rounded-md text-[10px] font-black transition-all ${editorBrush===s?'bg-slate-800 text-white':'bg-slate-100 text-slate-400 hover:bg-slate-200'}`}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex-1"/>
+                <button onClick={()=>{stateRef.current.grid=Array.from({length:GRID_H},()=>Array(GRID_W).fill(0));updateGridCache();}}
+                  className="bg-slate-100 hover:bg-red-100 hover:text-red-600 text-slate-500 font-bold px-3 py-1.5 rounded-xl text-xs transition-colors">Clear</button>
+                <button onClick={saveEditor}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-1.5 rounded-xl text-xs shadow transition-colors">Save Map</button>
+                <button onClick={()=>setGameStatus('menu')}
+                  className="bg-white hover:bg-slate-50 text-slate-400 font-bold px-3 py-1.5 rounded-xl text-xs border border-slate-200 transition-colors">✕ Exit</button>
+              </div>
+              {/* Status bar */}
+              <div className="px-4 py-1.5 text-[10px] text-slate-400 font-medium">
+                {{obstacle:'🧱 Click/drag to place obstacles (impassable terrain)',erase:'🧹 Click/drag to erase tiles',spawn1:'🔵 Click to place Player 1 start territory (3×3)',spawn2:'🔴 Click to place bot start territory — each click cycles Bot 1→2→3'}[editorTool]}
               </div>
             </div>
           )}
