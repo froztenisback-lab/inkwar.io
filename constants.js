@@ -41,9 +41,9 @@ export const UNITS = {
 
 export const BUCKET_UPGRADES = [
   { radius:1, label:'Basic',  desc:'1×1',  cocoaCost:0  },
-  { radius:2, label:'Wide',   desc:'3×3',  cocoaCost:8  },
-  { radius:3, label:'Splash', desc:'5×5',  cocoaCost:20 },
-  { radius:4, label:'Flood',  desc:'7×7',  cocoaCost:45 },
+  { radius:2, label:'Wide',   desc:'3×3',  cocoaCost:2000 },
+  { radius:3, label:'Splash', desc:'5×5',  cocoaCost:4000 },
+  { radius:4, label:'Flood',  desc:'7×7',  cocoaCost:8000 },
 ];
 
 export const COLORS = { 
