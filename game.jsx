@@ -1692,53 +1692,51 @@ export default function App() {
             className="canvas-viewport custom-scrollbar"
             style={{ touchAction: 'none' }}
           >
-            <div className="relative flex items-start justify-start min-w-full min-h-full overflow-auto">
-              <div className="relative shadow-2xl shrink-0 m-auto" style={{ 
-                width: dims.w * CELL_SIZE * zoom, 
-                height: dims.h * CELL_SIZE * zoom,
-                transition: 'width 0.05s ease-out, height 0.05s ease-out'
-              }}>
-              <canvas 
-                ref={canvasRef} 
-                width={dims.w * CELL_SIZE} 
-                height={dims.h * CELL_SIZE}
-                style={{ 
-                  transform: `scale(${zoom})`, 
-                  transformOrigin: '0 0', 
-                  imageRendering: 'pixelated',
-                  position: 'absolute',
-                  top: 0, left: 0
-                }}
-                className="cursor-crosshair touch-none bg-white z-0"
-                onMouseDown={e=>{if(e.button===0){isMouseDown.current=true;handleCanvasClick(e,true);}}}
-                onMouseMove={e=>{if(isMouseDown.current)handleCanvasClick(e,false);}}
-                onMouseLeave={()=>{isMouseDown.current=false;}}
-                onMouseUp={()=>{isMouseDown.current=false;}}
-              />
+            <div className="relative shadow-2xl shrink-0 m-auto" style={{ 
+              width: dims.w * CELL_SIZE * zoom, 
+              height: dims.h * CELL_SIZE * zoom,
+              transition: 'width 0.05s ease-out, height 0.05s ease-out'
+            }}>
+            <canvas 
+              ref={canvasRef} 
+              width={dims.w * CELL_SIZE} 
+              height={dims.h * CELL_SIZE}
+              style={{ 
+                transform: `scale(${zoom})`, 
+                transformOrigin: '0 0', 
+                imageRendering: 'pixelated',
+                position: 'absolute',
+                top: 0, left: 0
+              }}
+              className="cursor-crosshair touch-none bg-white z-0"
+              onMouseDown={e=>{if(e.button===0){isMouseDown.current=true;handleCanvasClick(e,true);}}}
+              onMouseMove={e=>{if(isMouseDown.current)handleCanvasClick(e,false);}}
+              onMouseLeave={()=>{isMouseDown.current=false;}}
+              onMouseUp={()=>{isMouseDown.current=false;}}
+            />
 
-              {/* Gift Potatoes Button (Desktop - Tethered to World) */}
-              {popup?.type === 'gift' && !isMobile && (
-                <div 
-                  className="absolute z-50 pointer-events-auto" 
-                  style={{ 
-                    left: (popup.gridX * CELL_SIZE + CELL_SIZE/2) * zoom, 
-                    top: (popup.gridY * CELL_SIZE) * zoom,
-                    transform: 'translate(-50%, -100%)',
-                    marginBottom: '12px'
-                  }}
+            {/* Gift Potatoes Button (Desktop - Tethered to World) */}
+            {popup?.type === 'gift' && !isMobile && (
+              <div 
+                className="absolute z-50 pointer-events-auto" 
+                style={{ 
+                  left: (popup.gridX * CELL_SIZE + CELL_SIZE/2) * zoom, 
+                  top: (popup.gridY * CELL_SIZE) * zoom,
+                  transform: 'translate(-50%, -100%)',
+                  marginBottom: '12px'
+                }}
+              >
+                <button 
+                  onMouseDown={e => e.stopPropagation()}
+                  onClick={(e) => { e.stopPropagation(); giftPotatoes(100); }}
+                  disabled={ui.potatoes < 100}
+                  className="flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 text-white font-bold py-2.5 px-4 rounded-2xl shadow-2xl transition-all active:scale-95 whitespace-nowrap border-2 border-white animate-in fade-in zoom-in duration-150"
                 >
-                  <button 
-                    onMouseDown={e => e.stopPropagation()}
-                    onClick={(e) => { e.stopPropagation(); giftPotatoes(100); }}
-                    disabled={ui.potatoes < 100}
-                    className="flex items-center justify-center gap-2 bg-amber-500 hover:bg-amber-600 disabled:bg-slate-200 text-white font-bold py-2.5 px-4 rounded-2xl shadow-2xl transition-all active:scale-95 whitespace-nowrap border-2 border-white animate-in fade-in zoom-in duration-150"
-                  >
-                    <ArrowUp size={16} strokeWidth={3} />
-                    <span className="text-xs">Gift 100 🥔</span>
-                  </button>
-                </div>
-              )}
+                  <ArrowUp size={16} strokeWidth={3} />
+                  <span className="text-xs">Gift 100 🥔</span>
+                </button>
               </div>
+            )}
             </div>
           </div>
 
