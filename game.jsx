@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { PaintBucket, Trophy, Play, Skull, Shield, Settings, Clock, ChevronDown, ChevronUp, Sword, Building2, ShoppingBag, Star, X, ArrowUp, Ship, Waves, ZoomIn, ZoomOut, LogOut, Maximize, RotateCcw } from 'lucide-react';
+import { PaintBucket, Trophy, Play, Skull, Shield, Settings, Clock, ChevronDown, ChevronUp, Sword, Building2, ShoppingBag, Star, X, ArrowUp, Ship, Waves, ZoomIn, ZoomOut, LogOut, Maximize, RotateCcw, ChevronLeft, ChevronRight, Target } from 'lucide-react';
 import { MAP_SETTINGS } from './custom_map';
 import { GRID_W, GRID_H, CELL_SIZE, TICK_RATE, FORT_WALL_OFFSET, getTexture, BLDG, UNITS, BUCKET_UPGRADES, COLORS, PLACEHOLDER_GRAY_RGB } from './constants';
 import { fmt, rnd, clamp, isOwned, isFortWall, fortWallOwner, findTiles, canPlaceBuilding, findBorderTile, getBuildingPerimeter, makeEnt, seededRnd } from './utils';
@@ -282,6 +282,22 @@ export default function App() {
     v.addEventListener('wheel', handleWheel, { passive: false });
     return () => v.removeEventListener('wheel', handleWheel);
   }, [handleWheel]);
+
+  // Navigation Pad Continuous Movement Logic
+  const navInterval = useRef(null);
+  const handleNavMove = (dx, dy) => {
+    const scroll = () => {
+      if (viewportRef.current) {
+        viewportRef.current.scrollLeft += dx * 20;
+        viewportRef.current.scrollTop += dy * 20;
+      }
+    };
+    scroll();
+    navInterval.current = setInterval(scroll, 30);
+  };
+  const stopNavMove = () => {
+    if (navInterval.current) clearInterval(navInterval.current);
+  };
 
   useEffect(() => {
     const mql = window.matchMedia('(max-width: 768px)');
@@ -1674,6 +1690,29 @@ export default function App() {
             </div>
           </div>
 
+          {/* Navigation D-Pad (The "Something Else" replacement for scrollbars) */}
+          {(gameStatus === 'playing' || gameStatus === 'editor') && (
+            <div className="nav-pad-wrapper animate-in fade-in slide-in-from-bottom-2">
+              <button className="nav-btn" onMouseDown={() => handleNavMove(0, -1)} onTouchStart={() => handleNavMove(0, -1)} onMouseUp={stopNavMove} onMouseLeave={stopNavMove} onTouchEnd={stopNavMove}>
+                <ChevronUp size={20}/>
+              </button>
+              <div className="nav-row">
+                <button className="nav-btn" onMouseDown={() => handleNavMove(-1, 0)} onTouchStart={() => handleNavMove(-1, 0)} onMouseUp={stopNavMove} onMouseLeave={stopNavMove} onTouchEnd={stopNavMove}>
+                  <ChevronLeft size={20}/>
+                </button>
+                <button className="nav-btn text-blue-500" onClick={() => { if(viewportRef.current) { viewportRef.current.scrollLeft = (viewportRef.current.scrollWidth - viewportRef.current.clientWidth)/2; viewportRef.current.scrollTop = (viewportRef.current.scrollHeight - viewportRef.current.clientHeight)/2; }}}>
+                  <Target size={18}/>
+                </button>
+                <button className="nav-btn" onMouseDown={() => handleNavMove(1, 0)} onTouchStart={() => handleNavMove(1, 0)} onMouseUp={stopNavMove} onMouseLeave={stopNavMove} onTouchEnd={stopNavMove}>
+                  <ChevronRight size={20}/>
+                </button>
+              </div>
+              <button className="nav-btn" onMouseDown={() => handleNavMove(0, 1)} onTouchStart={() => handleNavMove(0, 1)} onMouseUp={stopNavMove} onMouseLeave={stopNavMove} onTouchEnd={stopNavMove}>
+                <ChevronDown size={20}/>
+              </button>
+            </div>
+          )}
+
           {/* Peace Vote Button */}
           {showPeaceVote && gameStatus === 'playing' && (
             <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 animate-in zoom-in duration-300">
@@ -1692,7 +1731,8 @@ export default function App() {
             className="canvas-viewport custom-scrollbar"
             style={{ touchAction: 'none' }}
           >
-            <div className="relative shadow-2xl shrink-0 m-auto" style={{ 
+            <div className="flex min-w-full min-h-full p-[200px]">
+              <div className="relative shadow-2xl shrink-0 m-auto" style={{ 
               width: dims.w * CELL_SIZE * zoom, 
               height: dims.h * CELL_SIZE * zoom,
               transition: 'width 0.05s ease-out, height 0.05s ease-out'
@@ -1737,6 +1777,7 @@ export default function App() {
                 </button>
               </div>
             )}
+              </div>
             </div>
           </div>
 
