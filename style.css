@@ -286,6 +286,7 @@
             object {
                 vertical-align: middle;
                 display: block;
+
             }
             img,
             video {
@@ -1304,6 +1305,8 @@
                     height: calc(100vh - 180px); /* Adjust for header and potential bottom bar */
                     min-height: 350px;
                 }
+                .canvas-viewport { scrollbar-width: none; } /* Keep it clean on mobile, use D-Pad */
+                .canvas-viewport::-webkit-scrollbar { display: none; }
                 .sidebar-container {
                     display: grid;
                     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
@@ -1334,19 +1337,24 @@
                 overflow: auto;
                 background-color: #cbd5e1;
                 user-select: none;
-                /* Hide scrollbar for IE, Edge and Firefox */
-                -ms-overflow-style: none;
-                scrollbar-width: none;
-                justify-content: center;
-                top: 0;
+                /* Show custom scrollbars */
+                -ms-overflow-style: auto;
+                scrollbar-width: thin;
                 bottom: 0;
                 overscroll-behavior: none;
+                overflow: hidden;
             }
 
             /* Hide scrollbar for Chrome, Safari and Opera */
             .canvas-viewport::-webkit-scrollbar {
-                display: none;
+                width: 8px;
+                height: 8px;
+                display: block;
             }
+            .canvas-viewport::-webkit-scrollbar-track { display: none; }
+            .canvas-viewport::-webkit-scrollbar-thumb { display: none; }
+            .canvas-viewport::-webkit-scrollbar-thumb:hover { display: none; }
+
             .placing-ui-container {
                 width: 100%;
                 display: flex;
@@ -1458,6 +1466,7 @@
             .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
             .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
             .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
 
             .menu-overlay {
                 position: absolute;
@@ -2240,6 +2249,33 @@
             .editor-tool-btn:hover {
                 background-color: #e2e8f0;          /* slate-200 */
             }
+
+            /* ── Navigation Pad (The "Something Else") ───────────────────── */
+            .nav-pad-wrapper {
+                position: absolute;
+                left: 1.25rem;
+                bottom: 1.25rem;
+                z-index: 45;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 2px;
+                background: rgba(255,255,255,0.8);
+                backdrop-filter: blur(4px);
+                padding: 6px;
+                border-radius: 1rem;
+                border: 1px solid #e2e8f0;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            }
+
+            .nav-row { display: flex; gap: 2px; }
+            .nav-btn {
+                width: 36px; height: 36px;
+                display: flex; align-items: center; justify-content: center;
+                background: white; border: 1px solid #e2e8f0; border-radius: 8px;
+                color: #64748b; cursor: pointer; transition: all 0.1s;
+            }
+            .nav-btn:active { background: #f1f5f9; transform: scale(0.9); color: #2563eb; }
 
             /* ── Misc shared helpers ─────────────────────────────────────── */
 
