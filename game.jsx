@@ -28,6 +28,38 @@ const PlayerList = () => {
   );
 };
 
+const Game = () => {
+  // 1. Join the presence set with your player info
+  const { updateStatus } = usePresence('paintblitz-global', {
+    name: `Player_${Math.floor(Math.random() * 1000)}`,
+    color: '#ff4444' // Give them a random color later
+  });
+
+  // 2. Set up the Channel for actions (replacing your socket.io logic)
+  const { channel } = useChannel('paintblitz-global', (message) => {
+    if (message.name === 'paint_action') {
+      // Logic to paint the tile on YOUR screen when someone ELSE clicks
+      handleRemotePaint(message.data);
+    }
+  });
+
+  // ... (Your existing useEffects and refs)
+
+  return (
+    <div style={{ width: '100vw', height: '100vh', overflow: 'hidden' }}>
+      <PlayerList /> {/* <--- ADD THIS HERE */}
+      <canvas
+        ref={canvasRef}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onWheel={handleWheel}
+        style={{ cursor: isDragging ? 'grabbing' : 'crosshair', display: 'block' }}
+      />
+    </div>
+  );
+};
+
 function Game() {
   return (
     <div className="game-container">
