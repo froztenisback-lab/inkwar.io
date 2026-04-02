@@ -1521,7 +1521,7 @@ export default function App() {
       {/* Header */}
       <header className="game-header">
         <h1 className="text-2xl font-black text-blue-600 flex items-center gap-2">
-          <PaintBucket size={24} strokeWidth={2.5}/> PaintBlitz.io
+          <PaintBucket size={24} strokeWidth={2.5}/> inkwar.io
         </h1>
         <div className="flex items-center gap-2 flex-wrap">
           {isMobile && gameStatus === 'playing' && (
