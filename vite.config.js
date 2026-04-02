@@ -5,5 +5,5 @@ import react from '@vitejs/react-react'
 export default defineConfig({
   plugins: [react()],
   // If the environment is GitHub Actions, use the repo name, otherwise use root
-  base: process.env.GITHUB_PAGES ? '/inkwar.io/' : '/',
+  base: '/',
 })
