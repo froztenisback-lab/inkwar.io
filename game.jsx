@@ -15,6 +15,27 @@ const loadImage = (src) => new Promise((resolve, reject) => {
   img.onerror = () => reject(new Error(`Failed to load image: ${src}`));
 });
 
+// --- ADD THIS ABOVE YOUR 'const Game = () => {' ---
+
+const PlayerList = () => {
+  const { presenceData } = usePresence('paintblitz-global');
+
+  return (
+    <div style={{
+      position: 'fixed', top: '20px', right: '20px', 
+      backgroundColor: 'rgba(0,0,0,0.7)', color: 'white',
+      padding: '15px', borderRadius: '8px', zIndex: 100,
+      fontFamily: 'sans-serif', minWidth: '150px'
+    }}>
+      <h4 style={{ margin: '0 0 10px 0', borderBottom: '1px solid #444' }}>Players</h4>
+      {presenceData.map((player, i) => (
+        <div key={player.clientId || i} style={{ marginBottom: '5px', fontSize: '14px' }}>
+          <span style={{ color: player.data?.color || '#fff' }}>●</span> {player.data?.name || 'Joining...'}
+        </div>
+      ))}
+    </div>
+  );
+};
 // ─── Procedural Generation Helpers (Moved outside component) ────────────────
 
 // Value-noise terrain: interpolates a coarse lattice of random values
