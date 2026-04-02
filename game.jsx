@@ -1188,8 +1188,7 @@ export default function App() {
     }
   },[gameStatus,syncUI,addCocoa,updateGridCache,editorTool,editorBrush]);
 
-  // ── Mobile touch: 1-finger pan, tap-to-paint (no pinch zoom) ────────────────
-  // touchStartPos / touchHasMoved distinguish a short tap (paint) from a drag (pan).
+  // ── Mobile touch: Direct painting (panning handled by D-Pad) ────────────────
   const touchStartPos = useRef(null);
   const touchHasMoved = useRef(false);
 
@@ -1198,9 +1197,8 @@ export default function App() {
       const t = e.touches[0];
       touchStartPos.current = { x: t.clientX, y: t.clientY };
       touchHasMoved.current = false;
-      isMouseDown.current = false; // defer paint decision to touchEnd
-      // Start panning immediately — if it turns out to be a tap we'll paint on touchEnd
-      panStatus.current = { active: true, x: t.clientX, y: t.clientY };
+      isMouseDown.current = true;
+      handleCanvasClick({ clientX: t.clientX, clientY: t.clientY }, true);
     } else {
       // 2+ fingers: cancel everything — pinch zoom disabled
       panStatus.current = { active: false, x: 0, y: 0 };
@@ -1208,7 +1206,7 @@ export default function App() {
       e.preventDefault(); // Prevent browser from handling multi-touch gestures like pinch-to-zoom
       if (e.cancelable) e.preventDefault(); 
     }
-  }, []);
+  }, [handleCanvasClick]);
 
   const handleTouchMove = useCallback((e) => {
     if (e.touches.length > 1) {
@@ -1218,35 +1216,18 @@ export default function App() {
     if (e.cancelable) e.preventDefault();
     if (e.touches.length !== 1) return; // ignore multi-touch
     const t = e.touches[0];
-    // Detect movement threshold — 6px avoids false pans from a shaky tap
-    if (touchStartPos.current && !touchHasMoved.current) {
-      const d = Math.hypot(t.clientX - touchStartPos.current.x, t.clientY - touchStartPos.current.y);
-      if (d > 6) touchHasMoved.current = true;
+
+    if (isMouseDown.current) {
+      handleCanvasClick({ clientX: t.clientX, clientY: t.clientY }, false);
     }
-    // Pan the viewport
-    if (panStatus.current.active) {
-      const dx = t.clientX - panStatus.current.x;
-      const dy = t.clientY - panStatus.current.y;
-      setCamera(prev => clampCamera(prev.x - dx, prev.y - dy, zoom));
-      panStatus.current.x = t.clientX;
-      panStatus.current.y = t.clientY;
-    }
-  }, [zoom, clampCamera]);
+  }, [handleCanvasClick]);
 
   const handleTouchEnd = useCallback(() => {
-    const wasPanning = touchHasMoved.current;
     panStatus.current.active = false;
-
-    // If the finger barely moved, treat it as a tap → paint that cell
-    if (!wasPanning && touchStartPos.current) {
-      const fakeEvt = { clientX: touchStartPos.current.x, clientY: touchStartPos.current.y };
-      isMouseDown.current = true;
-      handleCanvasClick(fakeEvt, true);
-      isMouseDown.current = false;
-    }
+    isMouseDown.current = false;
     touchStartPos.current = null;
     touchHasMoved.current = false;
-  }, [handleCanvasClick]);
+  }, []);
 
   useEffect(() => {
     const v = viewportRef.current;
